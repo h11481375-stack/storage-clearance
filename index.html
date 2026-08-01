@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>清仓特卖 - 刷卡抢购</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .card-shadow {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        /* 卡片切出动画 */
+        .swipe-left {
+            transform: translateX(-120%) rotate(-15deg) !important;
+            opacity: 0 !important;
+            transition: all 0.4s ease-out;
+        }
+        .swipe-right {
+            transform: translateX(120%) rotate(15deg) !important;
+            opacity: 0 !important;
+            transition: all 0.4s ease-out;
+        }
+        .swipe-down {
+            transform: translateY(120%) !important;
+            opacity: 0 !important;
+            transition: all 0.4s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen flex flex-col items-center justify-between p-4 font-sans text-gray-100 overflow-hidden select-none">
+
+    <!-- 顶栏 header -->
+    <header class="w-full max-w-sm flex justify-between items-center py-2">
+        <span class="text-xl font-black tracking-wider text-red-500">🔥 CLEARANCE</span>
+        <span id="card-counter" class="text-xs bg-gray-800 text-gray-400 px-3 py-1 rounded-full border border-gray-700">加载中...</span>
+    </header>
+
+    <!-- 卡片展示容器 (Tinder Deck) -->
+    <main class="relative w-full max-w-sm h-[520px] flex items-center justify-center">
+        
+        <!-- 兜底提示：当所有卡片都刷完时显示 -->
+        <div id="empty-state" class="hidden text-center space-y-4 p-6 bg-gray-800 rounded-3xl border border-gray-700 w-full">
+            <div class="text-5xl">🎉</div>
+            <h2 class="text-xl font-bold">所有商品已浏览完毕！</h2>
+            <p class="text-sm text-gray-400">感谢参与清仓，有新商品上架时刷新即可。</p >
+            <button onclick="location.reload()" class="w-full py-3 bg-red-600 hover:bg-red-500 rounded-xl font-bold transition">重新刷一遍</button>
+        </div>
+
+        <!-- 动态卡片插入点 -->
+        <div id="card-stack" class="relative w-full h-full"></div>
+
+    </main>
+
+    <!-- 底部操作按钮 -->
+    <footer id="action-buttons" class="w-full max-w-sm grid grid-cols-3 gap-3 pt-2 pb-4">
+        <!-- Pass 跳过 -->
+        <button onclick="handleAction('PASS')" 
+            class="flex flex-col items-center justify-center p-3 rounded-2xl bg-gray-800 border border-gray-700 hover:bg-gray-700 active:scale-95 transition">
+            <span class="text-2xl mb-1">👎</span>
+            <span class="text-xs font-bold text-gray-400">PASS (跳过)</span>
+        </button>
+
+        <!-- Share 拼单 -->
+        <button id="btn-share" onclick="handleAction('SHARING')" 
+            class="flex flex-col items-center justify-center p-3 rounded-2xl bg-indigo-600/20 border border-indigo-500/50 hover:bg-indigo-600/30 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed">
+            <span class="text-2xl mb-1">🤝</span>
+            <span id="text-share" class="text-xs font-bold text-indigo-400">SHARE (拼单)</span>
+        </button>
+
+        <!-- Claim All 包圆 -->
+        <button id="btn-claim" onclick="handleAction('CLAIM_ALL')" 
+            class="flex flex-col items-center justify-center p-3 rounded-2xl bg-red-600/20 border border-red-500/50 hover:bg-red-600/30 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed">
+            <span class="text-2xl mb-1">👑</span>
+            <span id="text-claim" class="text-xs font-bold text-red-400">CLAIM ALL (包圆)</span>
+        </button>
+    </footer>
+
+    <script>
+        // 1. 配置你的 Supabase 数据库信息
+        const SUPABASE_URL = 'https://vyzxhhetywwljkehelvo.supabase.co';
+        const SUPABASE_KEY = 'sb_secret_bFxIwFr6KrQ49cQqs5F5sw_OIgJd0Pt'; // 👈 替换成你的 sb_publis... 密钥
+
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let products = [];
+        let currentIndex = 0;
+
+        // 2. 从 Supabase 拉取所有清仓商品
+        async function loadProducts() {
+            const { data, error } = await supabaseClient
+                .from('products')
+                .select('*')
+                .order('id', { ascending: true });
+
+            if (error) {
+                alert('数据库读取失败，请检查密钥是否填写正确！');
+                return;
+            }
+
+            products = data || [];
+            if (products.length === 0) {
+                showEmptyState();
+            } else {
+                renderCurrentCard();
+            }
+        }
+
+        // 3. 渲染当前最上面的卡片
+        function renderCurrentCard() {
+            const cardStack = document.getElementById('card-stack');
+            cardStack.innerHTML = '';
+
+            if (currentIndex >= products.length) {
+                showEmptyState();
+                return;
+            }
+
+            const current = products[currentIndex];
+            document.getElementById('card-counter').innerText = `${currentIndex + 1} / ${products.length}`;
+
+            // 创建卡片 HTML 结构
+            const card = document.createElement('div');
+            card.id = `card-${current.id}`;
+            card.className = "absolute inset-0 bg-gray-800 rounded-3xl overflow-hidden card-shadow border border-gray-700 flex flex-col justify-between transition-all duration-300";
+            
+            // 构建卡片内容
+            card.innerHTML = `
+                <div class="relative w-full h-80 bg-gray-900 overflow-hidden">
+                    < img src="${current.image_url || 'https://via.placeholder.com/400x400?text=No+Image'}" 
+                         alt="${current.title}" 
+                         class="w-full h-full object-cover">
+                    <div class="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-red-400 border border-white/10">
+                        剩 ${current.stock} 件
+                    </div>
+                </div>
+
+                <div class="p-5 flex-1 flex flex-col justify-between">
+                    <div>
+                        <h2 class="text-xl font-black text-white line-clamp-1">${current.title}</h2>
+                        <p class="text-xs text-gray-400 mt-1">ID: #${current.id}</p >
+                    </div>
+
+                    <div id="card-status-badge" class="mt-2 text-center py-2 px-3 rounded-xl text-xs font-bold transition">
+                        <!-- 动态状态提示 -->
+                    </div>
+                </div>
+            `;
+
+            cardStack.appendChild(card);
+            updateButtonsState(current);
+        }
+
+        // 4. 根据商品状态更新底部按钮
+        function updateButtonsState(product) {
+            const btnClaim = document.getElementById('btn-claim');
+            const btnShare = document.getElementById('btn-share');
+            const textClaim = document.getElementById('text-claim');
+            const textShare = document.getElementById('text-share');
+            const badge = document.getElementById('card-status-badge');
+
+            if (product.status === 'AVAILABLE') {
+                btnClaim.disabled = false;
+                btnShare.disabled = false;
+                textClaim.innerText = "CLAIM ALL (包圆)";
+                textShare.innerText = "SHARE (拼单)";
+                badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20";
+                badge.innerText = "⚡ 两种模式均可选，先到先得！";
+            } else if (product.status === 'CLAIMED_ALL') {
+                btnClaim.disabled = true;
+                btnShare.disabled = true; // Share 按钮被禁用失效！
+                textClaim.innerText = "已被包圆";
+                textShare.innerText = "SHARE (已失效)";
+                badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/20";
+                badge.innerText = "🚫 该商品已被买家包圆！Share 模式已失效。";
+            } else if (product.status === 'SHARING') {
+                btnClaim.disabled = true; // Claim All 按钮被禁用失效！
+                btnShare.disabled = false;
+                textClaim.innerText = "CLAIM (已失效)";
+                textShare.innerText = "参与拼单";
+                badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20";
+                badge.innerText = "🤝 已有人发起拼单！包圆模式已失效。";
+            }
+        }
+
+        // 5. 处理用户的点击操作（Pass / Share / Claim All）
+        async function handleAction(actionType) {
+            if (currentIndex >= products.length) return;
+            const current = products[currentIndex];
+            const currentCard = document.getElementById(`card-${current.id}`);
+
+            if (actionType === 'PASS') {
+                // 直接切牌，不修改数据库
+                if (currentCard) currentCard.classList.add('swipe-down');
+                setTimeout(() => nextCard(), 300);
+                return;
+            }
+
+            // 再次校验数据库最新状态，防止并发冲突
+            const { data: latest } = await supabaseClient
+                .from('products')
+                .select('status')
+                .eq('id', current.id)
+                .single();
+
+            if (latest.status !== 'AVAILABLE' && latest.status !== actionType) {
+                alert('很遗憾！刚才有人抢先一步锁定了该商品模式。');
+                // 刷新卡片 UI 呈现最新的锁状态
+                current.status = latest.status;
+                updateButtonsState(current);
+                return;
+            }
+
+            // 如果当前是可用状态，写入状态更新
+            if (latest.status === 'AVAILABLE') {
+                const { error } = await supabaseClient
+                    .from('products')
+                    .update({ status: actionType })
+                    .eq('id', current.id);
+
+                if (error) {
+                    alert('操作失败，请重试');
+                    return;
+                }
+            }
+
+            // 执行卡片切出动画并进入下一张
+            if (actionType === 'CLAIM_ALL') {
+                if (currentCard) currentCard.classList.add('swipe-right');
+            } else if (actionType === 'SHARING') {
+                if (currentCard) currentCard.classList.add('swipe-left');
+            }
+
+            setTimeout(() => nextCard(), 300);
+        }
+
+        // 切到下一张卡片
+        function nextCard() {
+            currentIndex++;
+            renderCurrentCard();
+        }
+
+        // 无卡片时显示兜底提示
+        function showEmptyState() {
+            document.getElementById('card-stack').classList.add('hidden');
+            document.getElementById('action-buttons').classList.add('hidden');
+            document.getElementById('empty-state').classList.remove('hidden');
+            document.getElementById('card-counter').innerText = `0 / 0`;
+        }
+
+        // 6. 开启 Supabase Realtime 实时监听
+        supabaseClient
+            .channel('public:products')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products' }, payload => {
+                // 找到被更新的商品，更新内存中的状态
+                const updatedProduct = products.find(p => p.id === payload.new.id);
+                if (updatedProduct) {
+                    updatedProduct.status = payload.new.status;
+                    updatedProduct.stock = payload.new.stock;
+                    // 如果刚好是当前正在展示的卡片，实时更新 UI
+                    if (products[currentIndex] && products[currentIndex].id === payload.new.id) {
+                        updateButtonsState(payload.new);
+                    }
+                }
+            })
+            .subscribe();
+
+        // 页面加载启动
+        loadProducts();
+    </script>
+</body>
+</html>
