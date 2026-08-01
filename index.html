@@ -258,7 +258,7 @@
             }
         }
 
-        async function handleAction(actionType) {
+                async function handleAction(actionType) {
             if (!currentUser) {
                 checkUser();
                 return;
@@ -268,12 +268,14 @@
             const current = products[currentIndex];
             const currentCard = document.getElementById(`card-${current.id}`);
 
+            // 1. 如果是 PASS，直接滑走，不写数据库
             if (actionType === 'PASS') {
                 if (currentCard) currentCard.classList.add('swipe-down');
                 setTimeout(() => nextCard(), 250);
                 return;
             }
 
+            // 2. 从 Supabase 读取最新的状态和买家列表
             const { data: latest, error: fetchErr } = await supabaseClient
                 .from('products')
                 .select('status, claimed_by')
@@ -286,30 +288,48 @@
             }
 
             const currentStatus = latest.status || 'AVAILABLE';
+            const existingClaimers = latest.claimed_by ? latest.claimed_by.split(',').map(s => s.trim()) : [];
 
-            if (currentStatus !== 'AVAILABLE' && currentStatus !== actionType) {
-                alert('Oops! Someone else just locked this option.');
+            // 拦截：如果已经被包圆了（CLAIMED_ALL），不能再操作
+            if (currentStatus === 'CLAIMED_ALL') {
+                alert('Oops! This item has been claimed completely by ' + (latest.claimed_by || 'someone else'));
                 current.status = currentStatus;
                 current.claimed_by = latest.claimed_by;
                 updateButtonsState(current);
                 return;
             }
 
-            if (currentStatus === 'AVAILABLE') {
-                const { error: updateErr } = await supabaseClient
-                    .from('products')
-                    .update({ 
-                        status: actionType,
-                        claimed_by: currentUser 
-                    })
-                    .eq('id', current.id);
-
-                if (updateErr) {
-                    alert('Update failed: ' + updateErr.message);
-                    return;
-                }
+            // 拦截：如果已经被发起拼单（SHARING），但当前客人试图点击 CLAIM_ALL
+            if (currentStatus === 'SHARING' && actionType === 'CLAIM_ALL') {
+                alert('Oops! Someone already started sharing this item. You can only join SHARE.');
+                current.status = currentStatus;
+                current.claimed_by = latest.claimed_by;
+                updateButtonsState(current);
+                return;
             }
 
+            // 3. 拼接新的买家名字列表（防止同一人重复点击重复记录）
+            let updatedClaimers = [...existingClaimers];
+            if (!updatedClaimers.includes(currentUser)) {
+                updatedClaimers.push(currentUser);
+            }
+            const newClaimedByString = updatedClaimers.join(', ');
+
+            // 4. 更新 Supabase 数据库
+            const { error: updateErr } = await supabaseClient
+                .from('products')
+                .update({ 
+                    status: actionType,
+                    claimed_by: newClaimedByString 
+                })
+                .eq('id', current.id);
+
+            if (updateErr) {
+                alert('Update failed: ' + updateErr.message);
+                return;
+            }
+
+            // 动画并切换下一张
             if (actionType === 'CLAIM_ALL') {
                 if (currentCard) currentCard.classList.add('swipe-right');
             } else if (actionType === 'SHARING') {
@@ -317,11 +337,6 @@
             }
 
             setTimeout(() => nextCard(), 250);
-        }
-
-        function nextCard() {
-            currentIndex++;
-            renderCurrentCard();
         }
 
         function showEmptyState() {
