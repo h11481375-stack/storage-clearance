@@ -35,7 +35,7 @@
         <div class="bg-gray-800 border border-gray-700 w-full max-w-xs rounded-3xl p-6 text-center space-y-4 shadow-2xl">
             <div class="text-4xl">👋</div>
             <h3 class="text-lg font-bold text-white">Welcome to Clearance Sale</h3>
-            <p class="text-xs text-gray-400">Please enter your name or WhatsApp number so we can verify your claim.</p >
+            <p class="text-xs text-gray-400">Please enter your name or WhatsApp number so we can verify your claim.</p>
             <input type="text" id="username-input" placeholder="Your Name / WhatsApp No." 
                    class="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-red-500">
             <button onclick="saveUsername()" class="w-full py-3 bg-red-600 hover:bg-red-500 rounded-xl font-bold text-white transition">Start Browsing</button>
@@ -57,7 +57,7 @@
         <div id="empty-state" class="hidden text-center space-y-4 p-6 bg-gray-800 rounded-3xl border border-gray-700 w-full">
             <div class="text-5xl">🎉</div>
             <h2 class="text-xl font-bold">All Items Viewed!</h2>
-            <p class="text-sm text-gray-400">Thank you for participating. Refresh to check for new arrivals.</p >
+            <p class="text-sm text-gray-400">Thank you for participating. Refresh to check for new arrivals.</p>
             <button onclick="location.reload()" class="w-full py-3 bg-red-600 hover:bg-red-500 rounded-xl font-bold transition">Start Over</button>
         </div>
 
@@ -88,7 +88,7 @@
 
     <script>
         const SUPABASE_URL = 'https://vyzxhhetywwljkehelvo.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_tIGjO_Xe0Mv-9ormYe3VjQ_WGc1rlpR'; // 👈 别忘了填你的 Publishable Key
+        const SUPABASE_KEY = 'YOUR_PUBLISHABLE_KEY'; // 👈 替换你的 Publishable Key
 
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -168,7 +168,7 @@
             const current = products[currentIndex];
             document.getElementById('card-counter').innerText = `${currentIndex + 1} / ${products.length}`;
 
-            const imgUrl = (current.image_url && current.image_url.trim() !== '') 
+            const imgUrl = (current.image_url && typeof current.image_url === 'string' && current.image_url.trim() !== '') 
                 ? current.image_url.trim() 
                 : 'https://via.placeholder.com/400x400?text=No+Image';
 
@@ -190,17 +190,25 @@
             stockBadge.className = "absolute top-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-red-400 border border-white/10";
             stockBadge.innerText = `${current.stock || 0} left`;
 
-            // 价格标签（浮在图片左下角，视觉效果极佳）
+            // 价格控制逻辑（严密防护空值）
             const priceTag = document.createElement('div');
-            priceTag.className = "absolute bottom-3 left-3 bg-red-600/90 backdrop-blur-md px-3 py-1.5 rounded-xl flex items-baseline gap-1.5 shadow-lg border border-red-500/50";
+            priceTag.className = "absolute bottom-3 left-3 bg-red-600/90 backdrop-blur-md px-3 py-1.5 rounded-xl flex items-baseline gap-2 shadow-lg border border-red-500/50";
             
-            const priceText = current.price ? (current.price.toString().startsWith('$') ? current.price : `$${current.price}`) : 'Special Price';
-            const origPriceText = current.original_price ? (current.original_price.toString().startsWith('$') ? current.original_price : `$${current.original_price}`) : '';
+            const currentPrice = current.price ? (current.price.toString().startsWith('$') ? current.price : `$${current.price}`) : '';
+            const originalPrice = current.original_price ? (current.original_price.toString().startsWith('$') ? current.original_price : `$${current.original_price}`) : '';
 
-            priceTag.innerHTML = `
-                <span class="text-lg font-black text-white">${priceText}</span>
-                ${origPriceText ? `<span class="text-xs text-red-200 line-through opacity-80">${origPriceText}</span>` : ''}
-            `;
+            if (currentPrice && originalPrice) {
+                priceTag.innerHTML = `
+                    <span class="text-xl font-black text-white">${currentPrice}</span>
+                    <span class="text-xs text-red-200 line-through opacity-75">${originalPrice}</span>
+                `;
+            } else if (currentPrice) {
+                priceTag.innerHTML = `<span class="text-xl font-black text-white">${currentPrice}</span>`;
+            } else if (originalPrice) {
+                priceTag.innerHTML = `<span class="text-xl font-black text-white">${originalPrice}</span>`;
+            } else {
+                priceTag.innerHTML = `<span class="text-sm font-bold text-white">Special Deal</span>`;
+            }
 
             imgContainer.appendChild(imgEl);
             imgContainer.appendChild(stockBadge);
@@ -211,7 +219,7 @@
             contentContainer.innerHTML = `
                 <div>
                     <h2 class="text-xl font-black text-white line-clamp-1">${current.title || 'Clearance Item'}</h2>
-                    <p class="text-xs text-gray-400 mt-1">ID: #${current.id}</p >
+                    <p class="text-xs text-gray-400 mt-1">ID: #${current.id}</p>
                 </div>
                 <div id="card-status-badge" class="mt-2 text-center py-2 px-3 rounded-xl text-xs font-bold transition"></div>
             `;
@@ -220,44 +228,56 @@
             card.appendChild(contentContainer);
 
             cardStack.appendChild(card);
-            updateButtonsState(current);
+            
+            // 安全调用更新按钮状态
+            try {
+                updateButtonsState(current);
+            } catch (err) {
+                console.error('Error updating buttons:', err);
+            }
         }
 
-               function updateButtonsState(product) {
+        // 强效防御的按钮状态函数
+        function updateButtonsState(product) {
             const btnClaim = document.getElementById('btn-claim');
             const btnShare = document.getElementById('btn-share');
             const textClaim = document.getElementById('text-claim');
             const textShare = document.getElementById('text-share');
             const badge = document.getElementById('card-status-badge');
 
-            if (!badge) return;
+            if (!badge || !product) return;
 
-            const claimersList = product.claimed_by ? product.claimed_by.split(',').map(s => s.trim()).filter(Boolean) : [];
+            // 安全解析 claimed_by 字段，防止 null 报错
+            const claimersList = (product.claimed_by && typeof product.claimed_by === 'string') 
+                ? product.claimed_by.split(',').map(s => s.trim()).filter(Boolean) 
+                : [];
+            
             const claimerCount = claimersList.length;
             const claimerInfo = product.claimed_by ? ` by ${product.claimed_by}` : '';
+            const status = product.status || 'AVAILABLE';
 
-            if (product.status === 'AVAILABLE' || !product.status) {
+            if (status === 'AVAILABLE') {
                 btnClaim.disabled = false;
                 btnShare.disabled = false;
                 textClaim.innerText = "CLAIM ALL";
                 textShare.innerText = "SHARE";
                 badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20";
                 badge.innerText = "⚡ Available! Claim or Share now.";
-            } else if (product.status === 'CLAIMED_ALL') {
+            } else if (status === 'CLAIMED_ALL') {
                 btnClaim.disabled = true;
                 btnShare.disabled = true;
                 textClaim.innerText = "CLAIMED";
                 textShare.innerText = "EXPIRED";
                 badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/20";
                 badge.innerText = `🚫 Claimed${claimerInfo}! Share mode disabled.`;
-            } else if (product.status === 'SHARING') {
+            } else if (status === 'SHARING') {
                 btnClaim.disabled = true;
                 btnShare.disabled = false;
                 textClaim.innerText = "EXPIRED";
                 textShare.innerText = "JOIN SHARE";
                 badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20";
                 badge.innerText = `🤝 Share active (${claimerCount}/3)${claimerInfo}! Join now.`;
-            } else if (product.status === 'SHARE_FULL') {
+            } else if (status === 'SHARE_FULL') {
                 btnClaim.disabled = true;
                 btnShare.disabled = true;
                 textClaim.innerText = "EXPIRED";
@@ -267,8 +287,7 @@
             }
         }
 
-
-                       async function handleAction(actionType) {
+        async function handleAction(actionType) {
             if (!currentUser) {
                 checkUser();
                 return;
@@ -278,14 +297,12 @@
             const current = products[currentIndex];
             const currentCard = document.getElementById(`card-${current.id}`);
 
-            // 1. PASS 跳过
             if (actionType === 'PASS') {
                 if (currentCard) currentCard.classList.add('swipe-down');
                 setTimeout(() => nextCard(), 250);
                 return;
             }
 
-            // 2. 读取最新状态
             const { data: latest, error: fetchErr } = await supabaseClient
                 .from('products')
                 .select('status, claimed_by')
@@ -298,9 +315,10 @@
             }
 
             const currentStatus = latest.status || 'AVAILABLE';
-            const existingClaimers = latest.claimed_by ? latest.claimed_by.split(',').map(s => s.trim()).filter(Boolean) : [];
+            const existingClaimers = (latest.claimed_by && typeof latest.claimed_by === 'string') 
+                ? latest.claimed_by.split(',').map(s => s.trim()).filter(Boolean) 
+                : [];
 
-            // 拦截 A：全包包圆
             if (currentStatus === 'CLAIMED_ALL') {
                 alert('Oops! This item has been claimed completely by ' + (latest.claimed_by || 'someone else'));
                 current.status = currentStatus;
@@ -309,7 +327,6 @@
                 return;
             }
 
-            // 拦截 B：拼单已满员 (3/3)
             if (currentStatus === 'SHARE_FULL') {
                 alert('Oops! This group share is already full (3/3 players).');
                 current.status = currentStatus;
@@ -318,7 +335,6 @@
                 return;
             }
 
-            // 拦截 C：有人正在拼单，但试图点 CLAIM ALL
             if (currentStatus === 'SHARING' && actionType === 'CLAIM_ALL') {
                 alert('Oops! Someone already started sharing this item. You can only JOIN SHARE.');
                 current.status = currentStatus;
@@ -327,16 +343,14 @@
                 return;
             }
 
-            // 3. 计算新买家列表与状态
             let updatedClaimers = [...existingClaimers];
             if (!updatedClaimers.includes(currentUser)) {
                 updatedClaimers.push(currentUser);
             }
 
-            const MAX_SHARE_PLAYERS = 3; // 👈 这里设置拼单上限人数（目前为 3 人，可随时修改）
+            const MAX_SHARE_PLAYERS = 3;
             let newStatus = actionType;
 
-            // 如果是拼单，且人数达到了上限，状态更改为 SHARE_FULL
             if (actionType === 'SHARING') {
                 if (updatedClaimers.length >= MAX_SHARE_PLAYERS) {
                     newStatus = 'SHARE_FULL';
@@ -345,7 +359,6 @@
 
             const newClaimedByString = updatedClaimers.join(', ');
 
-            // 4. 更新数据库
             const { error: updateErr } = await supabaseClient
                 .from('products')
                 .update({ 
@@ -359,7 +372,6 @@
                 return;
             }
 
-            // 动画滑动
             if (actionType === 'CLAIM_ALL') {
                 if (currentCard) currentCard.classList.add('swipe-right');
             } else if (actionType === 'SHARING') {
@@ -367,6 +379,11 @@
             }
 
             setTimeout(() => nextCard(), 250);
+        }
+
+        function nextCard() {
+            currentIndex++;
+            renderCurrentCard();
         }
 
         function showEmptyState() {
