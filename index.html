@@ -113,50 +113,54 @@
             }
         }
 
-        // 3. 渲染当前最上面的卡片
-        function renderCurrentCard() {
-            const cardStack = document.getElementById('card-stack');
-            cardStack.innerHTML = '';
+        // 3. 渲染当前最上面的卡片（已修复图片渲染漏洞）
+function renderCurrentCard() {
+    const cardStack = document.getElementById('card-stack');
+    cardStack.innerHTML = '';
 
-            if (currentIndex >= products.length) {
-                showEmptyState();
-                return;
-            }
+    if (currentIndex >= products.length) {
+        showEmptyState();
+        return;
+    }
 
-            const current = products[currentIndex];
-            document.getElementById('card-counter').innerText = `${currentIndex + 1} / ${products.length}`;
+    const current = products[currentIndex];
+    document.getElementById('card-counter').innerText = `${currentIndex + 1} / ${products.length}`;
 
-            // 创建卡片 HTML 结构
-            const card = document.createElement('div');
-            card.id = `card-${current.id}`;
-            card.className = "absolute inset-0 bg-gray-800 rounded-3xl overflow-hidden card-shadow border border-gray-700 flex flex-col justify-between transition-all duration-300";
-            
-            // 构建卡片内容
-            card.innerHTML = `
-                <div class="relative w-full h-80 bg-gray-900 overflow-hidden">
-                    < img src="${current.image_url || 'https://via.placeholder.com/400x400?text=No+Image'}" 
-                         alt="${current.title}" 
-                         class="w-full h-full object-cover">
-                    <div class="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-red-400 border border-white/10">
-                        剩 ${current.stock} 件
-                    </div>
-                </div>
+    // 处理图片链接：如果为空，使用默认占位图
+    const imgUrl = current.image_url && current.image_url.trim() !== '' 
+        ? current.image_url 
+        : 'https://via.placeholder.com/400x400?text=No+Image';
 
-                <div class="p-5 flex-1 flex flex-col justify-between">
-                    <div>
-                        <h2 class="text-xl font-black text-white line-clamp-1">${current.title}</h2>
-                        <p class="text-xs text-gray-400 mt-1">ID: #${current.id}</p >
-                    </div>
+    // 创建卡片
+    const card = document.createElement('div');
+    card.id = `card-${current.id}`;
+    card.className = "absolute inset-0 bg-gray-800 rounded-3xl overflow-hidden card-shadow border border-gray-700 flex flex-col justify-between transition-all duration-300";
+    
+    // 安全地拼接 DOM 内容
+    card.innerHTML = `
+        <div class="relative w-full h-80 bg-gray-900 overflow-hidden">
+            < img src="${imgUrl}" alt="${current.title}" class="w-full h-full object-cover">
+            <div class="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-red-400 border border-white/10">
+                剩 ${current.stock} 件
+            </div>
+        </div>
 
-                    <div id="card-status-badge" class="mt-2 text-center py-2 px-3 rounded-xl text-xs font-bold transition">
-                        <!-- 动态状态提示 -->
-                    </div>
-                </div>
-            `;
+        <div class="p-5 flex-1 flex flex-col justify-between">
+            <div>
+                <h2 class="text-xl font-black text-white line-clamp-1">${current.title}</h2>
+                <p class="text-xs text-gray-400 mt-1">ID: #${current.id}</p >
+            </div>
 
-            cardStack.appendChild(card);
-            updateButtonsState(current);
-        }
+            <div id="card-status-badge" class="mt-2 text-center py-2 px-3 rounded-xl text-xs font-bold transition">
+                <!-- 动态状态提示 -->
+            </div>
+        </div>
+    `;
+
+    cardStack.appendChild(card);
+    updateButtonsState(current);
+}
+
 
         // 4. 根据商品状态更新底部按钮
         function updateButtonsState(product) {
