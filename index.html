@@ -12,7 +12,6 @@
         .card-shadow {
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
         }
-        /* 卡片切出动画 */
         .swipe-left {
             transform: translateX(-120%) rotate(-15deg) !important;
             opacity: 0 !important;
@@ -38,10 +37,10 @@
         <span id="card-counter" class="text-xs bg-gray-800 text-gray-400 px-3 py-1 rounded-full border border-gray-700">加载中...</span>
     </header>
 
-    <!-- 卡片展示容器 (Tinder Deck) -->
+    <!-- 卡片展示容器 -->
     <main class="relative w-full max-w-sm h-[520px] flex items-center justify-center">
         
-        <!-- 兜底提示：当所有卡片都刷完时显示 -->
+        <!-- 兜底提示 -->
         <div id="empty-state" class="hidden text-center space-y-4 p-6 bg-gray-800 rounded-3xl border border-gray-700 w-full">
             <div class="text-5xl">🎉</div>
             <h2 class="text-xl font-bold">所有商品已浏览完毕！</h2>
@@ -56,21 +55,18 @@
 
     <!-- 底部操作按钮 -->
     <footer id="action-buttons" class="w-full max-w-sm grid grid-cols-3 gap-3 pt-2 pb-4">
-        <!-- Pass 跳过 -->
         <button onclick="handleAction('PASS')" 
             class="flex flex-col items-center justify-center p-3 rounded-2xl bg-gray-800 border border-gray-700 hover:bg-gray-700 active:scale-95 transition">
             <span class="text-2xl mb-1">👎</span>
             <span class="text-xs font-bold text-gray-400">PASS (跳过)</span>
         </button>
 
-        <!-- Share 拼单 -->
         <button id="btn-share" onclick="handleAction('SHARING')" 
             class="flex flex-col items-center justify-center p-3 rounded-2xl bg-indigo-600/20 border border-indigo-500/50 hover:bg-indigo-600/30 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed">
             <span class="text-2xl mb-1">🤝</span>
             <span id="text-share" class="text-xs font-bold text-indigo-400">SHARE (拼单)</span>
         </button>
 
-        <!-- Claim All 包圆 -->
         <button id="btn-claim" onclick="handleAction('CLAIM_ALL')" 
             class="flex flex-col items-center justify-center p-3 rounded-2xl bg-red-600/20 border border-red-500/50 hover:bg-red-600/30 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed">
             <span class="text-2xl mb-1">👑</span>
@@ -79,16 +75,15 @@
     </footer>
 
     <script>
-        // 1. 配置你的 Supabase 数据库信息（请替换 YOUR_PUBLISHABLE_KEY）
         const SUPABASE_URL = 'https://vyzxhhetywwljkehelvo.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_tIGjO_Xe0Mv-9ormYe3VjQ_WGc1rlpR'; // 👈 记得替换为你真实的 sb_publis... 密钥！
+        // 记得确认这里填的是你刚才那个 publishable key (sb_publishable_...)
+        const SUPABASE_KEY = 'sb_publishable_tIGjO_Xe0Mv-9ormYe3VjQ_WGc1rlpR'; 
 
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let products = [];
         let currentIndex = 0;
 
-        // 2. 从 Supabase 拉取所有清仓商品（带有详细报错提示）
         async function loadProducts() {
             try {
                 const { data, error } = await supabaseClient
@@ -97,8 +92,7 @@
                     .order('id', { ascending: true });
 
                 if (error) {
-                    alert('读取失败！\n错误代码：' + error.code + '\n详细报错：' + error.message);
-                    console.error('Supabase Error details:', error);
+                    alert('读取失败！\n代码：' + error.code + '\n信息：' + error.message);
                     return;
                 }
 
@@ -109,60 +103,64 @@
                     renderCurrentCard();
                 }
             } catch (err) {
-                alert('网络或 SDK 初始化异常：' + err.message);
+                alert('网络异常：' + err.message);
             }
         }
 
-        // 3. 渲染当前最上面的卡片（已修复图片渲染漏洞）
-function renderCurrentCard() {
-    const cardStack = document.getElementById('card-stack');
-    cardStack.innerHTML = '';
+        function renderCurrentCard() {
+            const cardStack = document.getElementById('card-stack');
+            cardStack.innerHTML = '';
 
-    if (currentIndex >= products.length) {
-        showEmptyState();
-        return;
-    }
+            if (currentIndex >= products.length) {
+                showEmptyState();
+                return;
+            }
 
-    const current = products[currentIndex];
-    document.getElementById('card-counter').innerText = `${currentIndex + 1} / ${products.length}`;
+            const current = products[currentIndex];
+            document.getElementById('card-counter').innerText = `${currentIndex + 1} / ${products.length}`;
 
-    // 处理图片链接：如果为空，使用默认占位图
-    const imgUrl = current.image_url && current.image_url.trim() !== '' 
-        ? current.image_url 
-        : 'https://via.placeholder.com/400x400?text=No+Image';
+            // 安全获取图片 URL
+            const imgUrl = (current.image_url && current.image_url.trim() !== '') 
+                ? current.image_url.trim() 
+                : 'https://via.placeholder.com/400x400?text=No+Image';
 
-    // 创建卡片
-    const card = document.createElement('div');
-    card.id = `card-${current.id}`;
-    card.className = "absolute inset-0 bg-gray-800 rounded-3xl overflow-hidden card-shadow border border-gray-700 flex flex-col justify-between transition-all duration-300";
-    
-    // 安全地拼接 DOM 内容
-    card.innerHTML = `
-        <div class="relative w-full h-80 bg-gray-900 overflow-hidden">
-            < img src="${imgUrl}" alt="${current.title}" class="w-full h-full object-cover">
-            <div class="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-red-400 border border-white/10">
-                剩 ${current.stock} 件
-            </div>
-        </div>
+            const card = document.createElement('div');
+            card.id = `card-${current.id}`;
+            card.className = "absolute inset-0 bg-gray-800 rounded-3xl overflow-hidden card-shadow border border-gray-700 flex flex-col justify-between transition-all duration-300";
+            
+            // 核心修复：纯 DOM 方式绑定 img，防止任何转义问题
+            const imgContainer = document.createElement('div');
+            imgContainer.className = "relative w-full h-80 bg-gray-900 overflow-hidden";
+            
+            const imgEl = document.createElement('img');
+            imgEl.src = imgUrl;
+            imgEl.alt = current.title || '商品图片';
+            imgEl.className = "w-full h-full object-cover";
 
-        <div class="p-5 flex-1 flex flex-col justify-between">
-            <div>
-                <h2 class="text-xl font-black text-white line-clamp-1">${current.title}</h2>
-                <p class="text-xs text-gray-400 mt-1">ID: #${current.id}</p >
-            </div>
+            const stockBadge = document.createElement('div');
+            stockBadge.className = "absolute top-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-red-400 border border-white/10";
+            stockBadge.innerText = `剩 ${current.stock || 0} 件`;
 
-            <div id="card-status-badge" class="mt-2 text-center py-2 px-3 rounded-xl text-xs font-bold transition">
-                <!-- 动态状态提示 -->
-            </div>
-        </div>
-    `;
+            imgContainer.appendChild(imgEl);
+            imgContainer.appendChild(stockBadge);
 
-    cardStack.appendChild(card);
-    updateButtonsState(current);
-}
+            const contentContainer = document.createElement('div');
+            contentContainer.className = "p-5 flex-1 flex flex-col justify-between";
+            contentContainer.innerHTML = `
+                <div>
+                    <h2 class="text-xl font-black text-white line-clamp-1">${current.title || '清仓商品'}</h2>
+                    <p class="text-xs text-gray-400 mt-1">ID: #${current.id}</p >
+                </div>
+                <div id="card-status-badge" class="mt-2 text-center py-2 px-3 rounded-xl text-xs font-bold transition"></div>
+            `;
 
+            card.appendChild(imgContainer);
+            card.appendChild(contentContainer);
 
-        // 4. 根据商品状态更新底部按钮
+            cardStack.appendChild(card);
+            updateButtonsState(current);
+        }
+
         function updateButtonsState(product) {
             const btnClaim = document.getElementById('btn-claim');
             const btnShare = document.getElementById('btn-share');
@@ -170,7 +168,9 @@ function renderCurrentCard() {
             const textShare = document.getElementById('text-share');
             const badge = document.getElementById('card-status-badge');
 
-            if (product.status === 'AVAILABLE') {
+            if (!badge) return;
+
+            if (product.status === 'AVAILABLE' || !product.status) {
                 btnClaim.disabled = false;
                 btnShare.disabled = false;
                 textClaim.innerText = "CLAIM ALL (包圆)";
@@ -179,13 +179,13 @@ function renderCurrentCard() {
                 badge.innerText = "⚡ 两种模式均可选，先到先得！";
             } else if (product.status === 'CLAIMED_ALL') {
                 btnClaim.disabled = true;
-                btnShare.disabled = true; // Share 按钮被禁用失效！
+                btnShare.disabled = true;
                 textClaim.innerText = "已被包圆";
                 textShare.innerText = "SHARE (已失效)";
                 badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/20";
                 badge.innerText = "🚫 该商品已被买家包圆！Share 模式已失效。";
             } else if (product.status === 'SHARING') {
-                btnClaim.disabled = true; // Claim All 按钮被禁用失效！
+                btnClaim.disabled = true;
                 btnShare.disabled = false;
                 textClaim.innerText = "CLAIM (已失效)";
                 textShare.innerText = "参与拼单";
@@ -194,7 +194,6 @@ function renderCurrentCard() {
             }
         }
 
-        // 5. 处理用户的点击操作（Pass / Share / Claim All）
         async function handleAction(actionType) {
             if (currentIndex >= products.length) return;
             const current = products[currentIndex];
@@ -206,7 +205,6 @@ function renderCurrentCard() {
                 return;
             }
 
-            // 再次校验数据库最新状态，防止并发冲突
             const { data: latest, error: fetchErr } = await supabaseClient
                 .from('products')
                 .select('status')
@@ -218,15 +216,16 @@ function renderCurrentCard() {
                 return;
             }
 
-            if (latest.status !== 'AVAILABLE' && latest.status !== actionType) {
+            const currentStatus = latest.status || 'AVAILABLE';
+
+            if (currentStatus !== 'AVAILABLE' && currentStatus !== actionType) {
                 alert('很遗憾！刚才有人抢先一步锁定了该商品模式。');
-                current.status = latest.status;
+                current.status = currentStatus;
                 updateButtonsState(current);
                 return;
             }
 
-            // 如果当前是可用状态，写入状态更新
-            if (latest.status === 'AVAILABLE') {
+            if (currentStatus === 'AVAILABLE') {
                 const { error: updateErr } = await supabaseClient
                     .from('products')
                     .update({ status: actionType })
@@ -238,7 +237,6 @@ function renderCurrentCard() {
                 }
             }
 
-            // 执行卡片切出动画并进入下一张
             if (actionType === 'CLAIM_ALL') {
                 if (currentCard) currentCard.classList.add('swipe-right');
             } else if (actionType === 'SHARING') {
@@ -248,13 +246,11 @@ function renderCurrentCard() {
             setTimeout(() => nextCard(), 300);
         }
 
-        // 切到下一张卡片
         function nextCard() {
             currentIndex++;
             renderCurrentCard();
         }
 
-        // 无卡片时显示兜底提示
         function showEmptyState() {
             document.getElementById('card-stack').classList.add('hidden');
             document.getElementById('action-buttons').classList.add('hidden');
@@ -262,7 +258,6 @@ function renderCurrentCard() {
             document.getElementById('card-counter').innerText = `0 / 0`;
         }
 
-        // 6. 开启 Supabase Realtime 实时监听
         supabaseClient
             .channel('public:products')
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products' }, payload => {
@@ -277,7 +272,6 @@ function renderCurrentCard() {
             })
             .subscribe();
 
-        // 页面加载启动
         loadProducts();
     </script>
 </body>
