@@ -223,7 +223,7 @@
             updateButtonsState(current);
         }
 
-        function updateButtonsState(product) {
+               function updateButtonsState(product) {
             const btnClaim = document.getElementById('btn-claim');
             const btnShare = document.getElementById('btn-share');
             const textClaim = document.getElementById('text-claim');
@@ -232,6 +232,8 @@
 
             if (!badge) return;
 
+            const claimersList = product.claimed_by ? product.claimed_by.split(',').map(s => s.trim()).filter(Boolean) : [];
+            const claimerCount = claimersList.length;
             const claimerInfo = product.claimed_by ? ` by ${product.claimed_by}` : '';
 
             if (product.status === 'AVAILABLE' || !product.status) {
@@ -254,11 +256,19 @@
                 textClaim.innerText = "EXPIRED";
                 textShare.innerText = "JOIN SHARE";
                 badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20";
-                badge.innerText = `🤝 Share initiated${claimerInfo}! Join now.`;
+                badge.innerText = `🤝 Share active (${claimerCount}/3)${claimerInfo}! Join now.`;
+            } else if (product.status === 'SHARE_FULL') {
+                btnClaim.disabled = true;
+                btnShare.disabled = true;
+                textClaim.innerText = "EXPIRED";
+                textShare.innerText = "FULL";
+                badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20";
+                badge.innerText = `🔒 Share FULL (3/3)${claimerInfo}! Locked for order.`;
             }
         }
 
-                async function handleAction(actionType) {
+
+                       async function handleAction(actionType) {
             if (!currentUser) {
                 checkUser();
                 return;
@@ -268,14 +278,14 @@
             const current = products[currentIndex];
             const currentCard = document.getElementById(`card-${current.id}`);
 
-            // 1. 如果是 PASS，直接滑走，不写数据库
+            // 1. PASS 跳过
             if (actionType === 'PASS') {
                 if (currentCard) currentCard.classList.add('swipe-down');
                 setTimeout(() => nextCard(), 250);
                 return;
             }
 
-            // 2. 从 Supabase 读取最新的状态和买家列表
+            // 2. 读取最新状态
             const { data: latest, error: fetchErr } = await supabaseClient
                 .from('products')
                 .select('status, claimed_by')
@@ -288,9 +298,9 @@
             }
 
             const currentStatus = latest.status || 'AVAILABLE';
-            const existingClaimers = latest.claimed_by ? latest.claimed_by.split(',').map(s => s.trim()) : [];
+            const existingClaimers = latest.claimed_by ? latest.claimed_by.split(',').map(s => s.trim()).filter(Boolean) : [];
 
-            // 拦截：如果已经被包圆了（CLAIMED_ALL），不能再操作
+            // 拦截 A：全包包圆
             if (currentStatus === 'CLAIMED_ALL') {
                 alert('Oops! This item has been claimed completely by ' + (latest.claimed_by || 'someone else'));
                 current.status = currentStatus;
@@ -299,27 +309,47 @@
                 return;
             }
 
-            // 拦截：如果已经被发起拼单（SHARING），但当前客人试图点击 CLAIM_ALL
-            if (currentStatus === 'SHARING' && actionType === 'CLAIM_ALL') {
-                alert('Oops! Someone already started sharing this item. You can only join SHARE.');
+            // 拦截 B：拼单已满员 (3/3)
+            if (currentStatus === 'SHARE_FULL') {
+                alert('Oops! This group share is already full (3/3 players).');
                 current.status = currentStatus;
                 current.claimed_by = latest.claimed_by;
                 updateButtonsState(current);
                 return;
             }
 
-            // 3. 拼接新的买家名字列表（防止同一人重复点击重复记录）
+            // 拦截 C：有人正在拼单，但试图点 CLAIM ALL
+            if (currentStatus === 'SHARING' && actionType === 'CLAIM_ALL') {
+                alert('Oops! Someone already started sharing this item. You can only JOIN SHARE.');
+                current.status = currentStatus;
+                current.claimed_by = latest.claimed_by;
+                updateButtonsState(current);
+                return;
+            }
+
+            // 3. 计算新买家列表与状态
             let updatedClaimers = [...existingClaimers];
             if (!updatedClaimers.includes(currentUser)) {
                 updatedClaimers.push(currentUser);
             }
+
+            const MAX_SHARE_PLAYERS = 3; // 👈 这里设置拼单上限人数（目前为 3 人，可随时修改）
+            let newStatus = actionType;
+
+            // 如果是拼单，且人数达到了上限，状态更改为 SHARE_FULL
+            if (actionType === 'SHARING') {
+                if (updatedClaimers.length >= MAX_SHARE_PLAYERS) {
+                    newStatus = 'SHARE_FULL';
+                }
+            }
+
             const newClaimedByString = updatedClaimers.join(', ');
 
-            // 4. 更新 Supabase 数据库
+            // 4. 更新数据库
             const { error: updateErr } = await supabaseClient
                 .from('products')
                 .update({ 
-                    status: actionType,
+                    status: newStatus,
                     claimed_by: newClaimedByString 
                 })
                 .eq('id', current.id);
@@ -329,7 +359,7 @@
                 return;
             }
 
-            // 动画并切换下一张
+            // 动画滑动
             if (actionType === 'CLAIM_ALL') {
                 if (currentCard) currentCard.classList.add('swipe-right');
             } else if (actionType === 'SHARING') {
