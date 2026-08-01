@@ -281,7 +281,7 @@
             }
         }
 
-        // 核心按钮与状态映射逻辑
+        // 核心：严格校验与按钮状态呈现
         function updateButtonsState(product) {
             const btnClaim = document.getElementById('btn-claim');
             const btnShare = document.getElementById('btn-share');
@@ -301,25 +301,18 @@
 
             const userAlreadyJoined = claimersList.includes(currentUser);
 
-            if (status === 'AVAILABLE') {
-                // 可选状态：两边均可点
-                btnClaim.disabled = false;
-                btnShare.disabled = false;
-                textClaim.innerText = "CLAIM ALL";
-                textShare.innerText = "SHARE";
-                badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20";
-                badge.innerText = "⚡ Available! Claim or Share now.";
-            } else if (status === 'CLAIMED_ALL') {
-                // 1️⃣ 独占成功：完全锁定，不能 Claim 也不能 Share
+            // 规则一：已经 CLAIM ALL，彻底锁死所有按钮
+            if (status === 'CLAIMED_ALL' || status === 'CLAIM_ALL') {
                 btnClaim.disabled = true;
                 btnShare.disabled = true;
                 textClaim.innerText = "CLAIMED";
                 textShare.innerText = "LOCKED";
                 badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/20";
                 badge.innerText = `👑 Claimed All${claimerInfo}! Sold out.`;
-            } else if (status === 'SHARING') {
-                // 2️⃣ 拼单进行中：锁死 CLAIM ALL，只留 SHARE 供加入
-                btnClaim.disabled = true; // ⛔ 禁用包圆按钮
+            } 
+            // 规则二：正在拼单，禁用 CLAIM ALL，仅开放 SHARE
+            else if (status === 'SHARING') {
+                btnClaim.disabled = true; // 彻底锁定 Claim All
                 textClaim.innerText = "LOCKED";
                 
                 if (userAlreadyJoined) {
@@ -333,14 +326,24 @@
                     badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20";
                     badge.innerText = `🤝 Group Share active (${claimerCount}/3)${claimerInfo}! Join now.`;
                 }
-            } else if (status === 'SHARE_FULL') {
-                // 拼单满员：全部锁定
+            } 
+            // 规则三：拼单全满
+            else if (status === 'SHARE_FULL') {
                 btnClaim.disabled = true;
                 btnShare.disabled = true;
                 textClaim.innerText = "LOCKED";
                 textShare.innerText = "FULL";
                 badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20";
                 badge.innerText = `🔒 Group Share FULL (3/3)${claimerInfo}! Locked for order.`;
+            } 
+            // 规则四：初始可抢状态
+            else {
+                btnClaim.disabled = false;
+                btnShare.disabled = false;
+                textClaim.innerText = "CLAIM ALL";
+                textShare.innerText = "SHARE";
+                badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20";
+                badge.innerText = "⚡ Available! Claim or Share now.";
             }
         }
 
@@ -360,7 +363,7 @@
                 return;
             }
 
-            // 关键：点击时拉取 Supabase 数据库最新状态，判断先到先得
+            // 实时向 Supabase 确认数据库最准确的最新状态，防止脏读
             const { data: latest, error: fetchErr } = await supabaseClient
                 .from('products')
                 .select('status, claimed_by')
@@ -377,29 +380,27 @@
                 ? latest.claimed_by.split(',').map(s => s.trim()).filter(Boolean) 
                 : [];
 
-            // 规则 1：有人率先 Claim All
-            if (currentStatus === 'CLAIMED_ALL') {
-                alert('Too late! This item was completely claimed by ' + (latest.claimed_by || 'someone else'));
-                current.status = currentStatus;
-                current.claimed_by = latest.claimed_by;
+            // 同步更新本地内存中的状态
+            current.status = currentStatus;
+            current.claimed_by = latest.claimed_by;
+
+            // 重点防御 1：已经被别人包圆 CLAIM ALL
+            if (currentStatus === 'CLAIMED_ALL' || currentStatus === 'CLAIM_ALL') {
+                alert('Too late! This item has been completely claimed by ' + (latest.claimed_by || 'someone else'));
                 updateButtonsState(current);
                 return;
             }
 
-            // 规则 2：有人率先发起/加入拼单，后来的人尝试 Claim All 被拒绝
+            // 重点防御 2：别人已经发起了 SHARE，后来的号不允许点 CLAIM ALL
             if ((currentStatus === 'SHARING' || currentStatus === 'SHARE_FULL') && actionType === 'CLAIM_ALL') {
                 alert('Cannot Claim All! Someone already started a Group Share on this item.');
-                current.status = currentStatus;
-                current.claimed_by = latest.claimed_by;
                 updateButtonsState(current);
                 return;
             }
 
-            // 规则 3：拼单已满员
+            // 重点防御 3：拼单人数已满
             if (currentStatus === 'SHARE_FULL' && actionType === 'SHARING') {
                 alert('Group Share is already full (3/3 players).');
-                current.status = currentStatus;
-                current.claimed_by = latest.claimed_by;
                 updateButtonsState(current);
                 return;
             }
@@ -420,6 +421,7 @@
 
             const newClaimedByString = updatedClaimers.join(', ');
 
+            // 向 Supabase 数据库提交更新
             const { error: updateErr } = await supabaseClient
                 .from('products')
                 .update({ 
@@ -432,6 +434,10 @@
                 alert('Update failed: ' + updateErr.message);
                 return;
             }
+
+            // 提交成功后立即更新本地数据状态
+            current.status = newStatus;
+            current.claimed_by = newClaimedByString;
 
             if (actionType === 'CLAIM_ALL') {
                 if (currentCard) currentCard.classList.add('swipe-right');
@@ -465,6 +471,7 @@
             }
         }
 
+        // 实时数据库同步订阅：当一个号点了，另一个号界面立刻被锁定
         supabaseClient
             .channel('public:products')
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products' }, payload => {
@@ -473,8 +480,10 @@
                     updatedProduct.status = payload.new.status;
                     updatedProduct.stock = payload.new.stock;
                     updatedProduct.claimed_by = payload.new.claimed_by;
+                    
+                    // 如果刚好显示的是被修改的商品，立刻刷新按钮
                     if (products[currentIndex] && products[currentIndex].id === payload.new.id) {
-                        updateButtonsState(payload.new);
+                        updateButtonsState(updatedProduct);
                     }
                 }
             })
