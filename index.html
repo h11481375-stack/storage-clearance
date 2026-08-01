@@ -176,13 +176,15 @@
             card.id = `card-${current.id}`;
             card.className = "absolute inset-0 bg-gray-800 rounded-3xl overflow-hidden card-shadow border border-gray-700 flex flex-col justify-between transition-all duration-300";
             
-            const imgContainer = document.createElement('div');
-            imgContainer.className = "relative w-full h-80 bg-gray-900 overflow-hidden";
-            
-            const imgEl = document.createElement('img');
-            imgEl.src = imgUrl;
-            imgEl.alt = current.title || 'Product Image';
-            imgEl.className = "w-full h-full object-cover";
+            // 替换为修改后：
+const imgContainer = document.createElement('div');
+imgContainer.className = "relative w-full aspect-square bg-black/40 overflow-hidden flex items-center justify-center"; // 使用 1:1 的展示区域，完整包含图片
+
+const imgEl = document.createElement('img');
+imgEl.src = imgUrl;
+imgEl.alt = current.title || 'Product Image';
+imgEl.className = "w-full h-full object-contain"; // 👈 核心：改成 object-contain，16:9 图片就会完整呈现，不裁剪
+imgEl.decoding = "async";
             imgEl.decoding = "async";
 
             // 库存标签
