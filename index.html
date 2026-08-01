@@ -4,35 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Clearance Sale - Swipe & Claim</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Supabase JS SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Faster CDN Imports -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         .card-shadow {
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
         }
         .swipe-left {
             transform: translateX(-120%) rotate(-15deg) !important;
             opacity: 0 !important;
-            transition: all 0.4s ease-out;
+            transition: all 0.3s ease-out;
         }
         .swipe-right {
             transform: translateX(120%) rotate(15deg) !important;
             opacity: 0 !important;
-            transition: all 0.4s ease-out;
+            transition: all 0.3s ease-out;
         }
         .swipe-down {
             transform: translateY(120%) !important;
             opacity: 0 !important;
-            transition: all 0.4s ease-out;
+            transition: all 0.3s ease-out;
         }
     </style>
 </head>
 <body class="bg-gray-900 min-h-screen flex flex-col items-center justify-between p-4 font-sans text-gray-100 overflow-hidden select-none">
 
     <!-- User Identity Modal -->
-    <div id="user-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div id="user-modal" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-gray-800 border border-gray-700 w-full max-w-xs rounded-3xl p-6 text-center space-y-4 shadow-2xl">
             <div class="text-4xl">👋</div>
             <h3 class="text-lg font-bold text-white">Welcome to Clearance Sale</h3>
@@ -52,9 +51,8 @@
         <span id="card-counter" class="text-xs bg-gray-800 text-gray-400 px-3 py-1 rounded-full border border-gray-700">Loading...</span>
     </header>
 
-    <!-- Main Tinder Card Deck -->
+    <!-- Main Card Deck -->
     <main class="relative w-full max-w-sm h-[520px] flex items-center justify-center">
-        
         <!-- Empty State -->
         <div id="empty-state" class="hidden text-center space-y-4 p-6 bg-gray-800 rounded-3xl border border-gray-700 w-full">
             <div class="text-5xl">🎉</div>
@@ -65,26 +63,22 @@
 
         <!-- Dynamic Card Insertion -->
         <div id="card-stack" class="relative w-full h-full"></div>
-
     </main>
 
     <!-- Action Buttons -->
     <footer id="action-buttons" class="w-full max-w-sm grid grid-cols-3 gap-3 pt-2 pb-4">
-        <!-- PASS -->
         <button onclick="handleAction('PASS')" 
             class="flex flex-col items-center justify-center p-3 rounded-2xl bg-gray-800 border border-gray-700 hover:bg-gray-700 active:scale-95 transition">
             <span class="text-2xl mb-1">👎</span>
             <span class="text-xs font-bold text-gray-400">PASS</span>
         </button>
 
-        <!-- SHARE -->
         <button id="btn-share" onclick="handleAction('SHARING')" 
             class="flex flex-col items-center justify-center p-3 rounded-2xl bg-indigo-600/20 border border-indigo-500/50 hover:bg-indigo-600/30 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed">
             <span class="text-2xl mb-1">🤝</span>
             <span id="text-share" class="text-xs font-bold text-indigo-400">SHARE</span>
         </button>
 
-        <!-- CLAIM ALL -->
         <button id="btn-claim" onclick="handleAction('CLAIM_ALL')" 
             class="flex flex-col items-center justify-center p-3 rounded-2xl bg-red-600/20 border border-red-500/50 hover:bg-red-600/30 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed">
             <span class="text-2xl mb-1">👑</span>
@@ -94,7 +88,7 @@
 
     <script>
         const SUPABASE_URL = 'https://vyzxhhetywwljkehelvo.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_tIGjO_Xe0Mv-9ormYe3VjQ_WGc1rlpR'; // 👈 Replace with your full publishable key
+        const SUPABASE_KEY = 'sb_publishable_tIGjO_Xe0Mv-9ormYe3VjQ_WGc1rlpR'; // 👈 别忘了填你的 Publishable Key
 
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -102,7 +96,6 @@
         let currentIndex = 0;
         let currentUser = localStorage.getItem('clearance_user') || '';
 
-        // Check user logic
         function checkUser() {
             if (!currentUser) {
                 document.getElementById('user-modal').classList.remove('hidden');
@@ -127,6 +120,15 @@
             localStorage.removeItem('clearance_user');
             currentUser = '';
             checkUser();
+        }
+
+        function preloadImages(index) {
+            for (let i = index + 1; i <= index + 3 && i < products.length; i++) {
+                if (products[i] && products[i].image_url) {
+                    const img = new Image();
+                    img.src = products[i].image_url.trim();
+                }
+            }
         }
 
         async function loadProducts() {
@@ -161,6 +163,8 @@
                 return;
             }
 
+            preloadImages(currentIndex);
+
             const current = products[currentIndex];
             document.getElementById('card-counter').innerText = `${currentIndex + 1} / ${products.length}`;
 
@@ -179,13 +183,28 @@
             imgEl.src = imgUrl;
             imgEl.alt = current.title || 'Product Image';
             imgEl.className = "w-full h-full object-cover";
+            imgEl.decoding = "async";
 
+            // 库存标签
             const stockBadge = document.createElement('div');
             stockBadge.className = "absolute top-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-red-400 border border-white/10";
             stockBadge.innerText = `${current.stock || 0} left`;
 
+            // 价格标签（浮在图片左下角，视觉效果极佳）
+            const priceTag = document.createElement('div');
+            priceTag.className = "absolute bottom-3 left-3 bg-red-600/90 backdrop-blur-md px-3 py-1.5 rounded-xl flex items-baseline gap-1.5 shadow-lg border border-red-500/50";
+            
+            const priceText = current.price ? (current.price.toString().startsWith('$') ? current.price : `$${current.price}`) : 'Special Price';
+            const origPriceText = current.original_price ? (current.original_price.toString().startsWith('$') ? current.original_price : `$${current.original_price}`) : '';
+
+            priceTag.innerHTML = `
+                <span class="text-lg font-black text-white">${priceText}</span>
+                ${origPriceText ? `<span class="text-xs text-red-200 line-through opacity-80">${origPriceText}</span>` : ''}
+            `;
+
             imgContainer.appendChild(imgEl);
             imgContainer.appendChild(stockBadge);
+            imgContainer.appendChild(priceTag);
 
             const contentContainer = document.createElement('div');
             contentContainer.className = "p-5 flex-1 flex flex-col justify-between";
@@ -251,7 +270,7 @@
 
             if (actionType === 'PASS') {
                 if (currentCard) currentCard.classList.add('swipe-down');
-                setTimeout(() => nextCard(), 300);
+                setTimeout(() => nextCard(), 250);
                 return;
             }
 
@@ -297,7 +316,7 @@
                 if (currentCard) currentCard.classList.add('swipe-left');
             }
 
-            setTimeout(() => nextCard(), 300);
+            setTimeout(() => nextCard(), 250);
         }
 
         function nextCard() {
