@@ -42,6 +42,15 @@
         </div>
     </div>
 
+    <!-- Image Zoom / Fullscreen Modal -->
+    <div id="image-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex flex-col items-center justify-center p-2 cursor-zoom-out" onclick="closeImageModal()">
+        <button onclick="closeImageModal()" class="absolute top-4 right-4 bg-gray-800/80 text-white rounded-full w-10 h-10 flex items-center justify-center text-xl font-bold border border-gray-600 z-10">✕</button>
+        <div class="relative w-full h-full flex items-center justify-center p-2">
+            <img id="modal-img" src="" alt="Zoomed View" class="max-w-full max-h-full object-contain rounded-xl shadow-2xl">
+        </div>
+        <span class="text-xs text-gray-400 mb-2">Tap anywhere to close</span>
+    </div>
+
     <!-- Header -->
     <header class="w-full max-w-sm flex justify-between items-center py-2">
         <div class="flex items-center gap-2">
@@ -122,6 +131,18 @@
             checkUser();
         }
 
+        // 图片放大弹窗逻辑
+        function openImageModal(imgSrc) {
+            const modal = document.getElementById('image-modal');
+            const modalImg = document.getElementById('modal-img');
+            modalImg.src = imgSrc;
+            modal.classList.remove('hidden');
+        }
+
+        function closeImageModal() {
+            document.getElementById('image-modal').classList.add('hidden');
+        }
+
         function preloadImages(index) {
             for (let i = index + 1; i <= index + 3 && i < products.length; i++) {
                 if (products[i] && products[i].image_url) {
@@ -176,25 +197,30 @@
             card.id = `card-${current.id}`;
             card.className = "absolute inset-0 bg-gray-800 rounded-3xl overflow-hidden card-shadow border border-gray-700 flex flex-col justify-between transition-all duration-300";
             
-            // 替换为修改后：
-const imgContainer = document.createElement('div');
-imgContainer.className = "relative w-full aspect-square bg-black/40 overflow-hidden flex items-center justify-center"; // 使用 1:1 的展示区域，完整包含图片
+            // 改变展示容器为 1:1 或适合展示区域，且带放大手势提示
+            const imgContainer = document.createElement('div');
+            imgContainer.className = "relative w-full h-80 bg-black/50 overflow-hidden flex items-center justify-center cursor-zoom-in group";
+            imgContainer.onclick = () => openImageModal(imgUrl); // 点击放大
 
-const imgEl = document.createElement('img');
-imgEl.src = imgUrl;
-imgEl.alt = current.title || 'Product Image';
-imgEl.className = "w-full h-full object-contain"; // 👈 核心：改成 object-contain，16:9 图片就会完整呈现，不裁剪
-imgEl.decoding = "async";
+            const imgEl = document.createElement('img');
+            imgEl.src = imgUrl;
+            imgEl.alt = current.title || 'Product Image';
+            imgEl.className = "w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"; // object-contain 保证完整不被裁剪
             imgEl.decoding = "async";
+
+            // 放大图标提示
+            const zoomHint = document.createElement('div');
+            zoomHint.className = "absolute top-3 left-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full text-xs text-gray-300 border border-white/10 flex items-center justify-center pointer-events-none";
+            zoomHint.innerHTML = "🔍";
 
             // 库存标签
             const stockBadge = document.createElement('div');
-            stockBadge.className = "absolute top-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-red-400 border border-white/10";
+            stockBadge.className = "absolute top-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-red-400 border border-white/10 pointer-events-none";
             stockBadge.innerText = `${current.stock || 0} left`;
 
-            // 价格控制逻辑（严密防护空值）
+            // 价格标签
             const priceTag = document.createElement('div');
-            priceTag.className = "absolute bottom-3 left-3 bg-red-600/90 backdrop-blur-md px-3 py-1.5 rounded-xl flex items-baseline gap-2 shadow-lg border border-red-500/50";
+            priceTag.className = "absolute bottom-3 left-3 bg-red-600/90 backdrop-blur-md px-3 py-1.5 rounded-xl flex items-baseline gap-2 shadow-lg border border-red-500/50 pointer-events-none";
             
             const currentPrice = current.price ? (current.price.toString().startsWith('$') ? current.price : `$${current.price}`) : '';
             const originalPrice = current.original_price ? (current.original_price.toString().startsWith('$') ? current.original_price : `$${current.original_price}`) : '';
@@ -213,6 +239,7 @@ imgEl.decoding = "async";
             }
 
             imgContainer.appendChild(imgEl);
+            imgContainer.appendChild(zoomHint);
             imgContainer.appendChild(stockBadge);
             imgContainer.appendChild(priceTag);
 
@@ -231,7 +258,6 @@ imgEl.decoding = "async";
 
             cardStack.appendChild(card);
             
-            // 安全调用更新按钮状态
             try {
                 updateButtonsState(current);
             } catch (err) {
@@ -239,7 +265,6 @@ imgEl.decoding = "async";
             }
         }
 
-        // 强效防御的按钮状态函数
         function updateButtonsState(product) {
             const btnClaim = document.getElementById('btn-claim');
             const btnShare = document.getElementById('btn-share');
@@ -249,7 +274,6 @@ imgEl.decoding = "async";
 
             if (!badge || !product) return;
 
-            // 安全解析 claimed_by 字段，防止 null 报错
             const claimersList = (product.claimed_by && typeof product.claimed_by === 'string') 
                 ? product.claimed_by.split(',').map(s => s.trim()).filter(Boolean) 
                 : [];
