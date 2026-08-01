@@ -66,32 +66,45 @@
         <div id="empty-state" class="hidden text-center space-y-4 p-6 bg-gray-800 rounded-3xl border border-gray-700 w-full">
             <div class="text-5xl">🎉</div>
             <h2 class="text-xl font-bold">All Items Viewed!</h2>
-            <p class="text-sm text-gray-400">Thank you for participating. Refresh to check for new arrivals.</p>
-            <button onclick="location.reload()" class="w-full py-3 bg-red-600 hover:bg-red-500 rounded-xl font-bold transition">Start Over</button>
+            <p class="text-sm text-gray-400">Thank you for participating. Refresh or undo to check items again.</p>
+            <div class="flex gap-2">
+                <button onclick="prevCard()" class="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl font-bold transition">↩️ Back</button>
+                <button onclick="location.reload()" class="flex-1 py-3 bg-red-600 hover:bg-red-500 rounded-xl font-bold transition">Start Over</button>
+            </div>
         </div>
 
         <!-- Dynamic Card Insertion -->
         <div id="card-stack" class="relative w-full h-full"></div>
     </main>
 
-    <!-- Action Buttons -->
-    <footer id="action-buttons" class="w-full max-w-sm grid grid-cols-3 gap-3 pt-2 pb-4">
+    <!-- Action Buttons (Updated with BACK button) -->
+    <footer id="action-buttons" class="w-full max-w-sm grid grid-cols-4 gap-2 pt-2 pb-4">
+        <!-- Back Button -->
+        <button id="btn-back" onclick="prevCard()" 
+            class="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-gray-800 border border-gray-700 hover:bg-gray-700 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed">
+            <span class="text-xl mb-0.5">↩️</span>
+            <span class="text-[10px] font-bold text-gray-400">BACK</span>
+        </button>
+
+        <!-- Pass Button -->
         <button onclick="handleAction('PASS')" 
-            class="flex flex-col items-center justify-center p-3 rounded-2xl bg-gray-800 border border-gray-700 hover:bg-gray-700 active:scale-95 transition">
-            <span class="text-2xl mb-1">👎</span>
-            <span class="text-xs font-bold text-gray-400">PASS</span>
+            class="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-gray-800 border border-gray-700 hover:bg-gray-700 active:scale-95 transition">
+            <span class="text-xl mb-0.5">👎</span>
+            <span class="text-[10px] font-bold text-gray-400">PASS</span>
         </button>
 
+        <!-- Share Button -->
         <button id="btn-share" onclick="handleAction('SHARING')" 
-            class="flex flex-col items-center justify-center p-3 rounded-2xl bg-indigo-600/20 border border-indigo-500/50 hover:bg-indigo-600/30 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed">
-            <span class="text-2xl mb-1">🤝</span>
-            <span id="text-share" class="text-xs font-bold text-indigo-400">SHARE</span>
+            class="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-indigo-600/20 border border-indigo-500/50 hover:bg-indigo-600/30 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed">
+            <span class="text-xl mb-0.5">🤝</span>
+            <span id="text-share" class="text-[10px] font-bold text-indigo-400">SHARE</span>
         </button>
 
+        <!-- Claim All Button -->
         <button id="btn-claim" onclick="handleAction('CLAIM_ALL')" 
-            class="flex flex-col items-center justify-center p-3 rounded-2xl bg-red-600/20 border border-red-500/50 hover:bg-red-600/30 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed">
-            <span class="text-2xl mb-1">👑</span>
-            <span id="text-claim" class="text-xs font-bold text-red-400">CLAIM ALL</span>
+            class="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-red-600/20 border border-red-500/50 hover:bg-red-600/30 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed">
+            <span class="text-xl mb-0.5">👑</span>
+            <span id="text-claim" class="text-[10px] font-bold text-red-400">CLAIM ALL</span>
         </button>
     </footer>
 
@@ -177,6 +190,9 @@
 
         function renderCurrentCard() {
             const cardStack = document.getElementById('card-stack');
+            const actionButtons = document.getElementById('action-buttons');
+            const emptyState = document.getElementById('empty-state');
+            
             cardStack.innerHTML = '';
 
             if (currentIndex >= products.length) {
@@ -184,10 +200,21 @@
                 return;
             }
 
+            // 恢复视图显示
+            cardStack.classList.remove('hidden');
+            actionButtons.classList.remove('hidden');
+            emptyState.classList.add('hidden');
+
             preloadImages(currentIndex);
 
             const current = products[currentIndex];
             document.getElementById('card-counter').innerText = `${currentIndex + 1} / ${products.length}`;
+
+            // 控制 BACK 按钮禁用/启用状态
+            const btnBack = document.getElementById('btn-back');
+            if (btnBack) {
+                btnBack.disabled = (currentIndex <= 0);
+            }
 
             const imgUrl = (current.image_url && typeof current.image_url === 'string' && current.image_url.trim() !== '') 
                 ? current.image_url.trim() 
@@ -197,28 +224,24 @@
             card.id = `card-${current.id}`;
             card.className = "absolute inset-0 bg-gray-800 rounded-3xl overflow-hidden card-shadow border border-gray-700 flex flex-col justify-between transition-all duration-300";
             
-            // 改变展示容器为 1:1 或适合展示区域，且带放大手势提示
             const imgContainer = document.createElement('div');
             imgContainer.className = "relative w-full h-80 bg-black/50 overflow-hidden flex items-center justify-center cursor-zoom-in group";
-            imgContainer.onclick = () => openImageModal(imgUrl); // 点击放大
+            imgContainer.onclick = () => openImageModal(imgUrl);
 
             const imgEl = document.createElement('img');
             imgEl.src = imgUrl;
             imgEl.alt = current.title || 'Product Image';
-            imgEl.className = "w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"; // object-contain 保证完整不被裁剪
+            imgEl.className = "w-full h-full object-contain transition-transform duration-300 group-hover:scale-105";
             imgEl.decoding = "async";
 
-            // 放大图标提示
             const zoomHint = document.createElement('div');
             zoomHint.className = "absolute top-3 left-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full text-xs text-gray-300 border border-white/10 flex items-center justify-center pointer-events-none";
             zoomHint.innerHTML = "🔍";
 
-            // 库存标签
             const stockBadge = document.createElement('div');
             stockBadge.className = "absolute top-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-red-400 border border-white/10 pointer-events-none";
             stockBadge.innerText = `${current.stock || 0} left`;
 
-            // 价格标签
             const priceTag = document.createElement('div');
             priceTag.className = "absolute bottom-3 left-3 bg-red-600/90 backdrop-blur-md px-3 py-1.5 rounded-xl flex items-baseline gap-2 shadow-lg border border-red-500/50 pointer-events-none";
             
@@ -412,11 +435,24 @@
             renderCurrentCard();
         }
 
+        // 返回 / 撤回上一张功能
+        function prevCard() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                renderCurrentCard();
+            }
+        }
+
         function showEmptyState() {
             document.getElementById('card-stack').classList.add('hidden');
-            document.getElementById('action-buttons').classList.add('hidden');
             document.getElementById('empty-state').classList.remove('hidden');
-            document.getElementById('card-counter').innerText = `0 / 0`;
+            document.getElementById('card-counter').innerText = `${products.length} / ${products.length}`;
+            
+            // 确保在 Empty State 状态下 BACK 按钮依然可以使用
+            const btnBack = document.getElementById('btn-back');
+            if (btnBack) {
+                btnBack.disabled = false;
+            }
         }
 
         supabaseClient
