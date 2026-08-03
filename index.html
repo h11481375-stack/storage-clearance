@@ -51,13 +51,42 @@
         <span class="text-xs text-gray-400 mb-2">Tap anywhere to close</span>
     </div>
 
+    <!-- My Claims Drawer Modal -->
+    <div id="claims-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4" onclick="closeClaimsModal(event)">
+        <div class="bg-gray-800 border border-gray-700 w-full max-w-md h-[85vh] sm:h-[80vh] rounded-t-3xl sm:rounded-3xl p-5 flex flex-col justify-between shadow-2xl" onclick="event.stopPropagation()">
+            <!-- Drawer Header -->
+            <div class="flex justify-between items-center border-b border-gray-700 pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🛒</span>
+                    <h3 class="text-lg font-black text-white">My Claims & Shares</h3>
+                </div>
+                <button onclick="toggleClaimsModal()" class="text-gray-400 hover:text-white text-xl font-bold p-1">✕</button>
+            </div>
+
+            <!-- Drawer Content (List) -->
+            <div id="claims-list" class="flex-1 overflow-y-auto py-4 space-y-3">
+                <!-- Items dynamically rendered here -->
+            </div>
+
+            <!-- Drawer Footer -->
+            <div class="border-t border-gray-700 pt-3">
+                <button onclick="toggleClaimsModal()" class="w-full py-3 bg-gray-700 hover:bg-gray-600 rounded-xl font-bold text-white transition text-sm">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Header -->
     <header class="w-full max-w-sm flex justify-between items-center py-2">
         <div class="flex items-center gap-2">
             <span class="text-xl font-black tracking-wider text-red-500">🔥 CLEARANCE</span>
             <span id="user-display" class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded border border-gray-700 cursor-pointer" onclick="changeUsername()">👤 Guest</span>
         </div>
-        <span id="card-counter" class="text-xs bg-gray-800 text-gray-400 px-3 py-1 rounded-full border border-gray-700">Loading...</span>
+        <div class="flex items-center gap-2">
+            <button onclick="toggleClaimsModal()" class="text-xs bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 px-2.5 py-1 rounded-full font-bold transition flex items-center gap-1">
+                🛒 Claims <span id="claims-badge" class="bg-indigo-500 text-white rounded-full text-[10px] px-1.5 py-0.2">0</span>
+            </button>
+            <span id="card-counter" class="text-xs bg-gray-800 text-gray-400 px-2.5 py-1 rounded-full border border-gray-700">Loading...</span>
+        </div>
     </header>
 
     <!-- Main Card Deck -->
@@ -111,7 +140,6 @@
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let products = [];
-        // 核心改变 1：读取本地保存的看卡进度（如果没有保存过，则默认从 0 开始）
         let currentIndex = parseInt(localStorage.getItem('clearance_last_index') || '0', 10);
         let currentUser = localStorage.getItem('clearance_user') || '';
         let timerInterval = null;
@@ -122,6 +150,7 @@
             } else {
                 document.getElementById('user-modal').classList.add('hidden');
                 document.getElementById('user-display').innerText = `👤 ${currentUser}`;
+                updateClaimsBadge();
             }
         }
 
@@ -153,6 +182,105 @@
             document.getElementById('image-modal').classList.add('hidden');
         }
 
+        /* ----- 我的预订（My Claims）逻辑 ----- */
+        function toggleClaimsModal() {
+            const modal = document.getElementById('claims-modal');
+            if (modal.classList.contains('hidden')) {
+                renderMyClaimsList();
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function closeClaimsModal(e) {
+            document.getElementById('claims-modal').classList.add('hidden');
+        }
+
+        function updateClaimsBadge() {
+            if (!currentUser) return;
+            const myItems = products.filter(p => {
+                const claimers = (p.claimed_by && typeof p.claimed_by === 'string') 
+                    ? p.claimed_by.split(',').map(s => s.trim()) 
+                    : [];
+                return claimers.includes(currentUser);
+            });
+            document.getElementById('claims-badge').innerText = myItems.length;
+        }
+
+        function renderMyClaimsList() {
+            const listContainer = document.getElementById('claims-list');
+            listContainer.innerHTML = '';
+
+            if (!currentUser) {
+                listContainer.innerHTML = `<p class="text-center text-gray-400 text-xs py-8">Please set your user name first.</p>`;
+                return;
+            }
+
+            const myItems = products.filter(p => {
+                const claimers = (p.claimed_by && typeof p.claimed_by === 'string') 
+                    ? p.claimed_by.split(',').map(s => s.trim()) 
+                    : [];
+                return claimers.includes(currentUser);
+            });
+
+            if (myItems.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="text-center py-10 space-y-2">
+                        <div class="text-3xl">🛒</div>
+                        <p class="text-sm font-bold text-gray-300">No Claims Yet</p>
+                        <p class="text-xs text-gray-500">Items you CLAIM or SHARE will appear here.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            myItems.forEach(item => {
+                const claimers = (item.claimed_by && typeof item.claimed_by === 'string') 
+                    ? item.claimed_by.split(',').map(s => s.trim()) 
+                    : [];
+                
+                const isClaimAll = item.status === 'CLAIMED_ALL' || item.status === 'CLAIM_ALL';
+                const currentPrice = item.price ? (item.price.toString().startsWith('$') ? item.price : `$${item.price}`) : 'Special Deal';
+
+                // 时间计算
+                let timeText = '';
+                if (item.share_expires_at) {
+                    const diff = new Date(item.share_expires_at).getTime() - new Date().getTime();
+                    if (diff <= 0 && claimers.length >= 2) {
+                        timeText = 'Expired';
+                    } else if (diff > 0) {
+                        const h = Math.floor(diff / (1000 * 60 * 60));
+                        const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                        timeText = `${h}h ${m}m left`;
+                    }
+                }
+
+                const itemCard = document.createElement('div');
+                itemCard.className = "bg-gray-900 border border-gray-700 rounded-2xl p-3 flex gap-3 items-center";
+                
+                itemCard.innerHTML = `
+                    <img src="${item.image_url || 'https://via.placeholder.com/100'}" class="w-16 h-16 object-contain rounded-xl bg-black/40 border border-gray-800">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-start">
+                            <h4 class="text-sm font-bold text-white truncate">${item.title || 'Item #' + item.id}</h4>
+                            <span class="text-xs font-black text-red-400 ml-2">${currentPrice}</span>
+                        </div>
+                        <p class="text-[10px] text-gray-500 mt-0.5">ID: #${item.id}</p>
+                        
+                        <div class="mt-2 flex items-center gap-1.5 flex-wrap">
+                            ${isClaimAll 
+                                ? `<span class="bg-red-500/20 text-red-400 border border-red-500/30 text-[10px] px-2 py-0.5 rounded-full font-bold">👑 Claimed All</span>`
+                                : `<span class="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[10px] px-2 py-0.5 rounded-full font-bold">🤝 Group Share (${claimers.length}/3)</span>`
+                            }
+                            ${timeText ? `<span class="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] px-2 py-0.5 rounded-full font-bold">⏳ ${timeText}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+                listContainer.appendChild(itemCard);
+            });
+        }
+
         function resetProgress() {
             currentIndex = 0;
             localStorage.setItem('clearance_last_index', '0');
@@ -170,7 +298,6 @@
 
         async function loadProducts() {
             try {
-                // 核心改变 2：按 ID 倒序排列（order 'id' false），让最新上传的品永远排在最前
                 const { data, error } = await supabaseClient
                     .from('products')
                     .select('*')
@@ -182,8 +309,8 @@
                 }
 
                 products = data || [];
+                updateClaimsBadge();
                 
-                // 防错逻辑：如果之前保存的进度超过了当前列表总数，安全归零
                 if (currentIndex >= products.length && products.length > 0) {
                     currentIndex = 0;
                     localStorage.setItem('clearance_last_index', '0');
@@ -202,7 +329,6 @@
         function renderCurrentCard() {
             if (timerInterval) clearInterval(timerInterval);
 
-            // 核心改变 3：实时同步保存当前看卡进度到本地
             localStorage.setItem('clearance_last_index', currentIndex.toString());
 
             const cardStack = document.getElementById('card-stack');
@@ -491,6 +617,8 @@
             current.claimed_by = newClaimedByString;
             current.share_expires_at = newExpiresAt;
 
+            updateClaimsBadge();
+
             if (actionType === 'CLAIM_ALL') {
                 if (currentCard) currentCard.classList.add('swipe-right');
             } else if (actionType === 'SHARING') {
@@ -534,6 +662,8 @@
                     updatedProduct.claimed_by = payload.new.claimed_by;
                     updatedProduct.share_expires_at = payload.new.share_expires_at;
                     
+                    updateClaimsBadge();
+
                     if (products[currentIndex] && products[currentIndex].id === payload.new.id) {
                         updateButtonsState(updatedProduct);
                     }
