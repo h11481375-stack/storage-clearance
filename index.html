@@ -66,10 +66,10 @@
         <div id="empty-state" class="hidden text-center space-y-4 p-6 bg-gray-800 rounded-3xl border border-gray-700 w-full">
             <div class="text-5xl">🎉</div>
             <h2 class="text-xl font-bold">All Items Viewed!</h2>
-            <p class="text-sm text-gray-400">Thank you for participating. Refresh or undo to check items again.</p>
+            <p class="text-sm text-gray-400">You're all caught up with the latest deals! Check back later for new arrivals.</p>
             <div class="flex gap-2">
                 <button onclick="prevCard()" class="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl font-bold transition">↩️ Back</button>
-                <button onclick="location.reload()" class="flex-1 py-3 bg-red-600 hover:bg-red-500 rounded-xl font-bold transition">Start Over</button>
+                <button onclick="resetProgress()" class="flex-1 py-3 bg-red-600 hover:bg-red-500 rounded-xl font-bold transition">Restart from Newest</button>
             </div>
         </div>
 
@@ -111,7 +111,8 @@
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let products = [];
-        let currentIndex = 0;
+        // 核心改变 1：读取本地保存的看卡进度（如果没有保存过，则默认从 0 开始）
+        let currentIndex = parseInt(localStorage.getItem('clearance_last_index') || '0', 10);
         let currentUser = localStorage.getItem('clearance_user') || '';
         let timerInterval = null;
 
@@ -152,6 +153,12 @@
             document.getElementById('image-modal').classList.add('hidden');
         }
 
+        function resetProgress() {
+            currentIndex = 0;
+            localStorage.setItem('clearance_last_index', '0');
+            renderCurrentCard();
+        }
+
         function preloadImages(index) {
             for (let i = index + 1; i <= index + 3 && i < products.length; i++) {
                 if (products[i] && products[i].image_url) {
@@ -163,10 +170,11 @@
 
         async function loadProducts() {
             try {
+                // 核心改变 2：按 ID 倒序排列（order 'id' false），让最新上传的品永远排在最前
                 const { data, error } = await supabaseClient
                     .from('products')
                     .select('*')
-                    .order('id', { ascending: true });
+                    .order('id', { ascending: false });
 
                 if (error) {
                     alert('Error loading data!\nCode: ' + error.code + '\nMessage: ' + error.message);
@@ -174,6 +182,13 @@
                 }
 
                 products = data || [];
+                
+                // 防错逻辑：如果之前保存的进度超过了当前列表总数，安全归零
+                if (currentIndex >= products.length && products.length > 0) {
+                    currentIndex = 0;
+                    localStorage.setItem('clearance_last_index', '0');
+                }
+
                 if (products.length === 0) {
                     showEmptyState();
                 } else {
@@ -186,6 +201,9 @@
 
         function renderCurrentCard() {
             if (timerInterval) clearInterval(timerInterval);
+
+            // 核心改变 3：实时同步保存当前看卡进度到本地
+            localStorage.setItem('clearance_last_index', currentIndex.toString());
 
             const cardStack = document.getElementById('card-stack');
             const actionButtons = document.getElementById('action-buttons');
@@ -284,7 +302,6 @@
             }
         }
 
-        // 核心更新：增加倒计时与基于人数的时效判断
         function updateButtonsState(product) {
             if (timerInterval) clearInterval(timerInterval);
 
@@ -305,7 +322,6 @@
             const status = product.status || 'AVAILABLE';
             const userAlreadyJoined = claimersList.includes(currentUser);
 
-            // 检查 24 小时拼单倒计时
             let isExpired = false;
             let timeRemainingText = '';
 
@@ -322,14 +338,12 @@
                     const seconds = Math.floor((diff % (1000 * 60)) / 1000);
                     timeRemainingText = `${hours}h ${minutes}m ${seconds}s`;
 
-                    // 开启 1 秒一次的实时倒计时刷屏
                     timerInterval = setInterval(() => {
                         updateButtonsState(product);
                     }, 1000);
                 }
             }
 
-            // 规则 1：独占 CLAIM ALL
             if (status === 'CLAIMED_ALL' || status === 'CLAIM_ALL') {
                 btnClaim.disabled = true;
                 btnShare.disabled = true;
@@ -338,7 +352,6 @@
                 badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/20";
                 badge.innerText = `👑 Claimed All${claimerInfo}! Sold out.`;
             } 
-            // 规则 2：24 小时倒计时已结束（只有在人数 >= 2 且超时时生效）
             else if (isExpired && claimerCount >= 2) {
                 btnClaim.disabled = true;
                 btnShare.disabled = true;
@@ -347,9 +360,8 @@
                 badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20";
                 badge.innerText = `⏳ 24h Time Up! Group Deal Closed with ${claimerCount} users (${product.claimed_by}).`;
             }
-            // 规则 3：正在拼单模式（SHARING）
             else if (status === 'SHARING') {
-                btnClaim.disabled = true; // 锁定独占按钮
+                btnClaim.disabled = true;
                 textClaim.innerText = "LOCKED";
 
                 let timeNotice = timeRemainingText ? ` (Ends in: ${timeRemainingText})` : ` (Waiting for 2nd user...)`;
@@ -366,7 +378,6 @@
                     badge.innerText = `🤝 Active Share (${claimerCount}/3)${timeNotice}! Join now.`;
                 }
             } 
-            // 规则 4：满 3 人拼单成功锁死
             else if (status === 'SHARE_FULL') {
                 btnClaim.disabled = true;
                 btnShare.disabled = true;
@@ -375,7 +386,6 @@
                 badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20";
                 badge.innerText = `🔒 Group Share FULL (3/3)${claimerInfo}! Locked for order.`;
             } 
-            // 规则 5：普通可抢状态
             else {
                 btnClaim.disabled = false;
                 btnShare.disabled = false;
@@ -402,7 +412,6 @@
                 return;
             }
 
-            // 实时向数据库拉取最新状态
             const { data: latest, error: fetchErr } = await supabaseClient
                 .from('products')
                 .select('status, claimed_by, share_expires_at')
@@ -423,21 +432,18 @@
             current.claimed_by = latest.claimed_by;
             current.share_expires_at = latest.share_expires_at;
 
-            // 1. 已被独占包圆
             if (currentStatus === 'CLAIMED_ALL' || currentStatus === 'CLAIM_ALL') {
                 alert('Too late! This item was completely claimed.');
                 updateButtonsState(current);
                 return;
             }
 
-            // 2. 已有拼单，不允许独占
             if ((currentStatus === 'SHARING' || currentStatus === 'SHARE_FULL') && actionType === 'CLAIM_ALL') {
                 alert('Cannot Claim All! A Group Share is already active.');
                 updateButtonsState(current);
                 return;
             }
 
-            // 3. 24小时拼单超时检查
             if (latest.share_expires_at && new Date(latest.share_expires_at).getTime() <= new Date().getTime() && existingClaimers.length >= 2) {
                 alert('This 24-hour group share has expired and closed.');
                 updateButtonsState(current);
@@ -454,10 +460,9 @@
             let newExpiresAt = latest.share_expires_at;
 
             if (actionType === 'SHARING') {
-                // 关键触发逻辑：当且仅当人数达到 2 人，且之前未设置倒计时，自动启动 24 小时倒计时
                 if (updatedClaimers.length === 2 && !newExpiresAt) {
                     const now = new Date();
-                    now.setHours(now.getHours() + 24); // 加上 24 小时
+                    now.setHours(now.getHours() + 24);
                     newExpiresAt = now.toISOString();
                 }
 
@@ -468,7 +473,6 @@
 
             const newClaimedByString = updatedClaimers.join(', ');
 
-            // 写入 Supabase 数据库
             const { error: updateErr } = await supabaseClient
                 .from('products')
                 .update({ 
