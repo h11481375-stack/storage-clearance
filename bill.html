@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Merchant Billing Center - 每日账单汇总</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-900 min-h-screen p-4 sm:p-8 font-sans text-gray-100 max-w-4xl mx-auto">
+
+    <!-- Header -->
+    <header class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
+        <div>
+            <h1 class="text-2xl font-black text-white flex items-center gap-2">
+                📊 Daily Billing Summary
+            </h1>
+            <p class="text-xs text-gray-400 mt-1">按客户自动归类明细与算账，发账单专用</p>
+        </div>
+        <button onclick="loadBills()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-xs text-white transition flex items-center gap-1 shadow-lg">
+            🔄 刷新账单数据
+        </button>
+    </header>
+
+    <!-- Stats Bar -->
+    <div id="stats-bar" class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+        <div class="bg-gray-800 border border-gray-700 rounded-2xl p-4">
+            <span class="text-xs text-gray-400">有待结账客户</span>
+            <div id="total-customers" class="text-2xl font-black text-white mt-1">0</div>
+        </div>
+        <div class="bg-gray-800 border border-gray-700 rounded-2xl p-4">
+            <span class="text-xs text-gray-400">预订商品总数</span>
+            <div id="total-claimed-items" class="text-2xl font-black text-indigo-400 mt-1">0</div>
+        </div>
+        <div class="bg-gray-800 border border-gray-700 rounded-2xl p-4 col-span-2 sm:col-span-1">
+            <span class="text-xs text-gray-400">待收总金额 estimate</span>
+            <div id="total-amount" class="text-2xl font-black text-green-400 mt-1">$0.00</div>
+        </div>
+    </div>
+
+    <!-- Main Customer List -->
+    <main id="customer-list" class="space-y-6">
+        <!-- JS 动态渲染每个客户的账单卡片 -->
+        <div class="text-center py-12 text-gray-500 text-sm">加载中...</div>
+    </main>
+
+    <script>
+        const SUPABASE_URL = 'https://vyzxhhetywwljkehelvo.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_tIGjO_Xe0Mv-9ormYe3VjQ_WGc1rlpR'; // 👈 替换你的 Supabase Key
+
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        async function loadBills() {
+            const listContainer = document.getElementById('customer-list');
+            listContainer.innerHTML = '<div class="text-center py-12 text-gray-500 text-sm">Loading billing data...</div>';
+
+            try {
+                // 获取所有 status 不是 AVAILABLE 的商品
+                const { data, error } = await supabaseClient
+                    .from('products')
+                    .select('*')
+                    .neq('status', 'AVAILABLE')
+                    .order('id', { ascending: false });
+
+                if (error) {
+                    alert('Error: ' + error.message);
+                    return;
+                }
+
+                if (!data || data.length === 0) {
+                    listContainer.innerHTML = `
+                        <div class="text-center py-16 bg-gray-800/50 rounded-3xl border border-gray-800">
+                            <div class="text-4xl mb-2">🎉</div>
+                            <h3 class="text-base font-bold text-gray-300">暂无待处理订单</h3>
+                            <p class="text-xs text-gray-500 mt-1">目前没有被抢购或拼单的商品。</p>
+                        </div>
+                    `;
+                    updateStats(0, 0, 0);
+                    return;
+                }
+
+                // 按客户名字做数据归类结构: { "CustomerName": [ item1, item2 ] }
+                const customerMap = {};
+                let grandTotalAmount = 0;
+                let totalItemsCount = 0;
+
+                data.forEach(item => {
+                    if (!item.claimed_by) return;
+
+                    // 拆分拼单/独占的人名 (兼容逗号分隔)
+                    const claimers = item.claimed_by.split(',').map(s => s.trim()).filter(Boolean);
+
+                    // 解析商品价格 (例如 "$15.5" 或 "15.5")
+                    let priceNum = 0;
+                    if (item.price) {
+                        const cleanedPrice = item.price.toString().replace(/[^0-9.]/g, '');
+                        priceNum = parseFloat(cleanedPrice) || 0;
+                    }
+
+                    claimers.forEach(user => {
+                        if (!customerMap[user]) {
+                            customerMap[user] = [];
+                        }
+                        customerMap[user].push({
+                            ...item,
+                            parsedPrice: priceNum
+                        });
+
+                        grandTotalAmount += priceNum;
+                        totalItemsCount++;
+                    });
+                });
+
+                const customers = Object.keys(customerMap);
+                updateStats(customers.length, totalItemsCount, grandTotalAmount);
+
+                if (customers.length === 0) {
+                    listContainer.innerHTML = `<p class="text-center text-gray-500 text-xs py-8">没有提取到有效客户名。</p>`;
+                    return;
+                }
+
+                // 清空并渲染列表
+                listContainer.innerHTML = '';
+
+                customers.forEach(customerName => {
+                    const items = customerMap[customerName];
+                    let customerSum = 0;
+
+                    // 创建客户账单卡片
+                    const card = document.createElement('div');
+                    card.className = "bg-gray-800 border border-gray-700 rounded-3xl p-5 shadow-xl space-y-4";
+
+                    // 渲染列表项 HTML
+                    let itemsHtml = '';
+                    items.forEach((item, idx) => {
+                        customerSum += item.parsedPrice;
+                        const priceDisplay = item.price ? (item.price.toString().startsWith('$') ? item.price : `$${item.price}`) : '$0';
+                        
+                        const isClaimAll = item.status === 'CLAIMED_ALL' || item.status === 'CLAIM_ALL';
+                        const badgeType = isClaimAll 
+                            ? `<span class="bg-red-500/20 text-red-400 border border-red-500/30 text-[10px] px-2 py-0.5 rounded-full font-bold">👑 Claimed All</span>`
+                            : `<span class="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[10px] px-2 py-0.5 rounded-full font-bold">🤝 Group Share</span>`;
+
+                        itemsHtml += `
+                            <div class="flex items-center justify-between bg-gray-900/80 p-3 rounded-2xl border border-gray-800/80">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <img src="${item.image_url || 'https://via.placeholder.com/80'}" class="w-12 h-12 object-contain rounded-xl bg-black/40 border border-gray-800 shrink-0">
+                                    <div class="min-w-0">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs font-black text-gray-400">#${item.id}</span>
+                                            <h4 class="text-xs font-bold text-white truncate">${item.title || 'Item #' + item.id}</h4>
+                                        </div>
+                                        <div class="mt-1 flex items-center gap-2">
+                                            ${badgeType}
+                                            <span class="text-[10px] text-gray-500">全部预订人: ${item.claimed_by}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="text-right shrink-0">
+                                    <span class="text-sm font-black text-red-400">${priceDisplay}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    // 组装卡片 Header 和 Footer
+                    card.innerHTML = `
+                        <div class="flex justify-between items-center border-b border-gray-700/60 pb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">👤</span>
+                                <h3 class="text-base font-black text-white">${customerName}</h3>
+                                <span class="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full font-bold">${items.length} items</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs text-gray-400">Total:</span>
+                                <span class="text-lg font-black text-green-400 ml-1">$${customerSum.toFixed(2)}</span>
+                            </div>
+                        </div>
+
+                        <!-- Items List -->
+                        <div class="space-y-2">
+                            ${itemsHtml}
+                        </div>
+
+                        <!-- Action Bar -->
+                        <div class="pt-2 flex gap-2">
+                            <button onclick="copyCustomerInvoice('${customerName}', ${JSON.stringify(items).replace(/"/g, '&quot;')}, ${customerSum})" 
+                                    class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-98 rounded-xl font-bold text-xs text-white transition flex items-center justify-center gap-1.5">
+                                📋 Copy Text Invoice (发送给客户)
+                            </button>
+                        </div>
+                    `;
+
+                    listContainer.appendChild(card);
+                });
+
+            } catch (err) {
+                alert('An error occurred: ' + err.message);
+            }
+        }
+
+        function updateStats(customers, items, amount) {
+            document.getElementById('total-customers').innerText = customers;
+            document.getElementById('total-claimed-items').innerText = items;
+            document.getElementById('total-amount').innerText = `$${amount.toFixed(2)}`;
+        }
+
+        // 一键生成发给客户的文本账单
+        function copyCustomerInvoice(customerName, items, totalSum) {
+            let text = `Hi ${customerName}! 👋 Here is your Clearance Sale Order Summary:\n\n`;
+            
+            items.forEach((item, i) => {
+                const price = item.price ? (item.price.toString().startsWith('$') ? item.price : `$${item.price}`) : 'Special Deal';
+                const type = (item.status === 'CLAIMED_ALL' || item.status === 'CLAIM_ALL') ? '👑 Claimed' : '🤝 Group Share';
+                text += `${i + 1}. Item #${item.id} - ${item.title || 'Product'} (${price}) [${type}]\n`;
+            });
+
+            text += `\n------------------\n`;
+            text += `📦 Total Items: ${items.length}\n`;
+            text += `💰 Total Amount: $${totalSum.toFixed(2)}\n\n`;
+            text += `Please confirm your address and let us know your preferred payment method! Thank you! ❤️`;
+
+            navigator.clipboard.writeText(text).then(() => {
+                alert(`Invoice for [${customerName}] copied to clipboard!\nYou can paste it directly to WhatsApp/Messenger.`);
+            }).catch(() => {
+                alert('Copy failed, please grant clipboard access.');
+            });
+        }
+
+        // 页面打开时自动加载一次
+        loadBills();
+    </script>
+</body>
+</html>
