@@ -484,7 +484,7 @@
                 textClaim.innerText = "LOCKED";
                 textShare.innerText = "CLOSED";
                 badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20";
-                badge.innerText = `⏳ 24h Time Up! Group Deal Closed with ${claimerCount} users (${product.claimed_by}).`;
+                badge.innerText = `⏳ 12h Time Up! Group Deal Closed with ${claimerCount} users (${product.claimed_by}).`;
             }
             else if (status === 'SHARING') {
                 btnClaim.disabled = true;
@@ -588,7 +588,7 @@
             if (actionType === 'SHARING') {
                 if (updatedClaimers.length === 2 && !newExpiresAt) {
                     const now = new Date();
-                    now.setHours(now.getHours() + 24);
+                    now.setHours(now.getHours() + 12);
                     newExpiresAt = now.toISOString();
                 }
 
