@@ -236,16 +236,18 @@
         }
 
         /* 双列无限滚动网格渲染逻辑 */
-        function renderGridView() {
-            const gridView = document.getElementById('grid-view');
-            gridView.innerHTML = '';
-            currentGridLoadedCount = 0;
+       /* 修复后的双列网格渲染逻辑 */
+function renderGridView() {
+    const gridView = document.getElementById('grid-view');
+    gridView.innerHTML = '';
+    currentGridLoadedCount = 0;
 
-            gridView.className = "hidden w-full h-full overflow-y-auto custom-scroll grid grid-cols-2 gap-3 p-1 content-start";
-            gridView.onscroll = handleGridScroll;
+    // 关键修复：把这里的 "hidden" 删掉，确保网格能正常展示
+    gridView.className = "w-full h-full overflow-y-auto custom-scroll grid grid-cols-2 gap-3 p-1 content-start";
+    gridView.onscroll = handleGridScroll;
 
-            loadMoreGridItems();
-        }
+    loadMoreGridItems();
+}
 
         function loadMoreGridItems() {
             const gridView = document.getElementById('grid-view');
