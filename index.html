@@ -4,101 +4,116 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Clearance Sale - Swipe & Claim</title>
-    <!-- Faster CDN Imports -->
+    <!-- Fonts & CDNs -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
-        .card-shadow {
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0b0f17;
+        }
+        .card-glow {
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 20px 0 rgba(255, 255, 255, 0.03);
+        }
+        .glass-panel {
+            background: rgba(18, 24, 38, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
         .swipe-left {
             transform: translateX(-120%) rotate(-15deg) !important;
             opacity: 0 !important;
-            transition: all 0.3s ease-out;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .swipe-right {
             transform: translateX(120%) rotate(15deg) !important;
             opacity: 0 !important;
-            transition: all 0.3s ease-out;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .swipe-down {
             transform: translateY(120%) !important;
             opacity: 0 !important;
-            transition: all 0.3s ease-out;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
     </style>
 </head>
-<body class="bg-gray-900 min-h-screen flex flex-col items-center justify-between p-4 font-sans text-gray-100 overflow-hidden select-none">
+<body class="bg-[#0b0f17] min-h-screen flex flex-col items-center justify-between p-4 text-gray-100 overflow-hidden select-none">
 
     <!-- User Identity Modal -->
-    <div id="user-modal" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-gray-800 border border-gray-700 w-full max-w-xs rounded-3xl p-6 text-center space-y-4 shadow-2xl">
-            <div class="text-4xl">👋</div>
-            <h3 class="text-lg font-bold text-white">Welcome to Clearance Sale</h3>
-            <p class="text-xs text-gray-400">Please enter your name or WhatsApp number so we can verify your claim.</p>
-            <input type="text" id="username-input" placeholder="Your Name / WhatsApp No." 
-                   class="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-red-500">
-            <button onclick="saveUsername()" class="w-full py-3 bg-red-600 hover:bg-red-500 rounded-xl font-bold text-white transition">Start Browsing</button>
+    <div id="user-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-xs rounded-3xl p-6 text-center space-y-4 shadow-2xl">
+            <div class="w-16 h-16 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-2">🔥</div>
+            <h3 class="text-xl font-extrabold text-white">Clearance Perks</h3>
+            <p class="text-xs text-gray-400 leading-relaxed">Enter your Name or WhatsApp No. to unlock exclusive claims and group deals.</p>
+            <input type="text" id="username-input" placeholder="Name or WhatsApp No." 
+                   class="w-full px-4 py-3.5 bg-gray-900/80 border border-white/10 rounded-2xl text-white text-sm focus:outline-none focus:border-red-500 transition">
+            <button onclick="saveUsername()" class="w-full py-3.5 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 rounded-2xl font-bold text-white shadow-lg shadow-red-900/30 transition active:scale-95">Start Browsing</button>
         </div>
     </div>
 
-    <!-- Image Zoom / Fullscreen Modal -->
-    <div id="image-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex flex-col items-center justify-center p-2 cursor-zoom-out" onclick="closeImageModal()">
-        <button onclick="closeImageModal()" class="absolute top-4 right-4 bg-gray-800/80 text-white rounded-full w-10 h-10 flex items-center justify-center text-xl font-bold border border-gray-600 z-10">✕</button>
+    <!-- Image Zoom Modal -->
+    <div id="image-modal" class="fixed inset-0 bg-black/95 backdrop-blur-xl z-50 hidden flex flex-col items-center justify-center p-2 cursor-zoom-out" onclick="closeImageModal()">
+        <button onclick="closeImageModal()" class="absolute top-6 right-6 glass-panel text-white rounded-full w-10 h-10 flex items-center justify-center text-lg font-bold z-10">✕</button>
         <div class="relative w-full h-full flex items-center justify-center p-2">
-            <img id="modal-img" src="" alt="Zoomed View" class="max-w-full max-h-full object-contain rounded-xl shadow-2xl">
+            <img id="modal-img" src="" alt="Zoomed View" class="max-w-full max-h-full object-contain rounded-2xl shadow-2xl">
         </div>
-        <span class="text-xs text-gray-400 mb-2">Tap anywhere to close</span>
     </div>
 
-    <!-- My Claims / Cart Modal (购物车/我的已抢弹窗) -->
-    <div id="cart-modal" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-gray-800 border border-gray-700 w-full max-w-sm rounded-3xl p-5 flex flex-col max-h-[80vh] shadow-2xl">
-            <div class="flex justify-between items-center pb-3 border-b border-gray-700">
-                <h3 class="text-base font-bold text-white flex items-center gap-2">🛒 My Claimed Items</h3>
+    <!-- My Claims / Cart Drawer Modal -->
+    <div id="cart-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center">
+        <div class="glass-panel w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 flex flex-col max-h-[80vh] shadow-2xl border-t border-white/10">
+            <div class="flex justify-between items-center pb-4 border-b border-white/10">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">🛒</span>
+                    <h3 class="text-base font-bold text-white">My Claimed Deals</h3>
+                </div>
                 <button onclick="closeCartModal()" class="text-gray-400 hover:text-white font-bold text-lg px-2">✕</button>
             </div>
             
-            <div id="cart-items-list" class="flex-1 overflow-y-auto py-3 space-y-3">
-                <!-- 动态渲染已抢商品 -->
-            </div>
+            <div id="cart-items-list" class="flex-1 overflow-y-auto py-4 space-y-3"></div>
 
-            <div class="pt-3 border-t border-gray-700 text-center">
-                <button onclick="closeCartModal()" class="w-full py-2.5 bg-gray-700 hover:bg-gray-600 rounded-xl text-xs font-bold text-gray-200">Close</button>
+            <div class="pt-3 border-t border-white/10">
+                <button onclick="closeCartModal()" class="w-full py-3 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-bold text-gray-300 transition">Close</button>
             </div>
         </div>
     </div>
 
     <!-- Header -->
-    <header class="w-full max-w-sm flex justify-between items-center py-2">
+    <header class="w-full max-w-sm flex justify-between items-center py-2 z-10">
         <div class="flex items-center gap-2">
-            <span class="text-xl font-black tracking-wider text-red-500">🔥 CLEARANCE</span>
-            <span id="user-display" class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded border border-gray-700 cursor-pointer" onclick="changeUsername()">👤 Guest</span>
+            <div class="flex items-center gap-1.5 font-black text-lg tracking-tight">
+                <span class="bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">CLEARANCE</span>
+            </div>
+            <span id="user-display" class="text-[10px] font-semibold bg-white/5 text-gray-400 px-2.5 py-1 rounded-full border border-white/10 cursor-pointer hover:bg-white/10 transition" onclick="changeUsername()">👤 Guest</span>
         </div>
         
         <div class="flex items-center gap-2">
-            <!-- 我的已抢 / 购物车按钮 -->
-            <button onclick="openCartModal()" class="text-xs bg-red-950/80 hover:bg-red-900/80 active:scale-95 text-red-300 px-2.5 py-1 rounded-full border border-red-800/60 transition cursor-pointer flex items-center gap-1 font-bold">
-                🛒 <span id="cart-count">0</span>
+            <button onclick="openCartModal()" class="text-xs glass-panel hover:bg-white/10 active:scale-95 text-red-400 px-3 py-1.5 rounded-full transition cursor-pointer flex items-center gap-1.5 font-bold">
+                🛒 <span id="cart-count" class="bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full text-[10px]">0</span>
             </button>
 
-            <!-- 页码按钮 -->
-            <button id="card-counter" onclick="jumpToPage()" title="Click to jump to page" class="text-xs bg-gray-800 hover:bg-gray-700 active:scale-95 text-gray-300 px-2.5 py-1 rounded-full border border-gray-700 transition cursor-pointer flex items-center gap-1">
+            <button id="card-counter" onclick="jumpToPage()" title="Click to jump to page" class="text-xs glass-panel hover:bg-white/10 active:scale-95 text-gray-300 px-3 py-1.5 rounded-full transition cursor-pointer flex items-center gap-1 font-semibold">
                 Loading...
             </button>
         </div>
     </header>
 
     <!-- Main Card Deck -->
-    <main class="relative w-full max-w-sm h-[520px] flex items-center justify-center">
+    <main class="relative w-full max-w-sm h-[530px] flex items-center justify-center my-auto">
         <!-- Empty State -->
-        <div id="empty-state" class="hidden text-center space-y-4 p-6 bg-gray-800 rounded-3xl border border-gray-700 w-full">
-            <div class="text-5xl">🎉</div>
-            <h2 class="text-xl font-bold">All Items Viewed!</h2>
-            <p class="text-sm text-gray-400">You're all caught up with the latest deals! Check back later for new arrivals.</p>
-            <div class="flex gap-2">
-                <button onclick="prevCard()" class="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl font-bold transition">↩️ Back</button>
-                <button onclick="resetProgress()" class="flex-1 py-3 bg-red-600 hover:bg-red-500 rounded-xl font-bold transition">Restart from Newest</button>
+        <div id="empty-state" class="hidden text-center space-y-5 p-8 glass-panel rounded-3xl w-full border border-white/10">
+            <div class="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center text-4xl mx-auto">🎉</div>
+            <div>
+                <h2 class="text-xl font-bold text-white">All Caught Up!</h2>
+                <p class="text-xs text-gray-400 mt-1">You've seen all clearance products for now.</p>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button onclick="prevCard()" class="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl font-bold text-xs transition">↩️ Back</button>
+                <button onclick="resetProgress()" class="flex-1 py-3 bg-red-600 hover:bg-red-500 rounded-2xl font-bold text-xs shadow-lg shadow-red-900/30 transition">Restart</button>
             </div>
         </div>
 
@@ -106,36 +121,38 @@
         <div id="card-stack" class="relative w-full h-full"></div>
     </main>
 
-    <!-- Action Buttons -->
-    <footer id="action-buttons" class="w-full max-w-sm grid grid-cols-4 gap-2 pt-2 pb-4">
-        <button id="btn-back" onclick="prevCard()" 
-            class="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-gray-800 border border-gray-700 hover:bg-gray-700 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed">
-            <span class="text-xl mb-0.5">↩️</span>
-            <span class="text-[10px] font-bold text-gray-400">BACK</span>
+    <!-- Action Buttons (Floating Circles Layout) -->
+    <footer id="action-buttons" class="w-full max-w-sm flex items-center justify-around py-3 px-2 z-10">
+        <!-- BACK -->
+        <button id="btn-back" onclick="prevCard()" title="Previous Item"
+            class="w-12 h-12 rounded-full glass-panel flex items-center justify-center text-lg text-gray-300 hover:scale-110 active:scale-95 transition disabled:opacity-20 disabled:cursor-not-allowed">
+            ↩️
         </button>
 
-        <button onclick="handleAction('PASS')" 
-            class="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-gray-800 border border-gray-700 hover:bg-gray-700 active:scale-95 transition">
-            <span class="text-xl mb-0.5">👎</span>
-            <span class="text-[10px] font-bold text-gray-400">PASS</span>
+        <!-- PASS -->
+        <button onclick="handleAction('PASS')" title="Pass"
+            class="w-14 h-14 rounded-full glass-panel border-gray-600/50 flex items-center justify-center text-xl text-gray-300 hover:scale-110 active:scale-95 transition hover:border-gray-400">
+            👎
         </button>
 
-        <button id="btn-share" onclick="handleAction('SHARING')" 
-            class="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-indigo-600/20 border border-indigo-500/50 hover:bg-indigo-600/30 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed">
-            <span class="text-xl mb-0.5">🤝</span>
-            <span id="text-share" class="text-[10px] font-bold text-indigo-400">SHARE</span>
+        <!-- SHARE -->
+        <button id="btn-share" onclick="handleAction('SHARING')" title="Share with friends"
+            class="w-16 h-16 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-500 text-white flex flex-col items-center justify-center shadow-lg shadow-indigo-900/40 hover:scale-110 active:scale-95 transition border border-indigo-400/30 disabled:opacity-30 disabled:cursor-not-allowed">
+            <span class="text-xl">🤝</span>
+            <span id="text-share" class="text-[9px] font-black tracking-tighter mt-0.5">SHARE</span>
         </button>
 
-        <button id="btn-claim" onclick="handleAction('CLAIM_ALL')" 
-            class="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-red-600/20 border border-red-500/50 hover:bg-red-600/30 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed">
-            <span class="text-xl mb-0.5">👑</span>
-            <span id="text-claim" class="text-[10px] font-bold text-red-400">CLAIM ALL</span>
+        <!-- CLAIM ALL -->
+        <button id="btn-claim" onclick="handleAction('CLAIM_ALL')" title="Claim All Stock"
+            class="w-16 h-16 rounded-full bg-gradient-to-tr from-red-600 to-orange-500 text-white flex flex-col items-center justify-center shadow-lg shadow-red-900/40 hover:scale-110 active:scale-95 transition border border-red-400/30 disabled:opacity-30 disabled:cursor-not-allowed">
+            <span class="text-xl">👑</span>
+            <span id="text-claim" class="text-[9px] font-black tracking-tighter mt-0.5">CLAIM ALL</span>
         </button>
     </footer>
 
     <script>
         const SUPABASE_URL = 'https://vyzxhhetywwljkehelvo.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_tIGjO_Xe0Mv-9ormYe3VjQ_WGc1rlpR'; // 👈 记得替换你的 Publishable Key
+        const SUPABASE_KEY = 'sb_publishable_tIGjO_Xe0Mv-9ormYe3VjQ_WGc1rlpR'; // 👈 记得替换你的 Key
 
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -182,7 +199,6 @@
             document.getElementById('image-modal').classList.add('hidden');
         }
 
-        /* ----- 购物车 / 我的已抢 Modal 逻辑 ----- */
         function openCartModal() {
             if (!currentUser) {
                 checkUser();
@@ -217,24 +233,24 @@
             });
 
             if (myClaimed.length === 0) {
-                container.innerHTML = `<div class="text-center py-8 text-xs text-gray-400">You haven't claimed any items yet.</div>`;
+                container.innerHTML = `<div class="text-center py-8 text-xs text-gray-500">You haven't claimed any items yet.</div>`;
                 return;
             }
 
             myClaimed.forEach(item => {
                 const itemEl = document.createElement('div');
-                itemEl.className = "flex items-center gap-3 p-2.5 bg-gray-900 border border-gray-700 rounded-2xl";
+                itemEl.className = "flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-2xl";
                 
                 const imgUrl = item.image_url || 'https://via.placeholder.com/100';
                 const typeBadge = (item.status === 'CLAIMED_ALL' || item.status === 'CLAIM_ALL') ? '👑 Claim All' : '🤝 Share';
 
                 itemEl.innerHTML = `
-                    <img src="${imgUrl}" class="w-12 h-12 object-cover rounded-xl bg-black">
+                    <img src="${imgUrl}" class="w-12 h-12 object-cover rounded-xl bg-black/40">
                     <div class="flex-1 min-w-0">
                         <div class="text-xs font-bold text-white truncate">${item.title || 'Product'}</div>
-                        <div class="text-[10px] text-gray-400 mt-0.5">${item.price || ''} • <span class="text-indigo-400">${typeBadge}</span></div>
+                        <div class="text-[10px] text-gray-400 mt-0.5">${item.price || ''} • <span class="text-indigo-400 font-semibold">${typeBadge}</span></div>
                     </div>
-                    <button onclick="cancelClaim(${item.id})" class="px-2.5 py-1.5 bg-red-600/20 hover:bg-red-600/40 border border-red-500/40 rounded-xl text-[10px] font-bold text-red-400 transition">
+                    <button onclick="cancelClaim(${item.id})" class="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl text-[10px] font-bold text-red-400 transition">
                         Cancel
                     </button>
                 `;
@@ -242,9 +258,8 @@
             });
         }
 
-        /* 取消抢购的核心逻辑 */
         async function cancelClaim(productId) {
-            if (!confirm("Are you sure you want to cancel your claim for this item?")) return;
+            if (!confirm("Cancel your claim for this item?")) return;
 
             const product = products.find(p => p.id === productId);
             if (!product) return;
@@ -253,23 +268,20 @@
                 ? product.claimed_by.split(',').map(s => s.trim()).filter(Boolean)
                 : [];
 
-            // 移除当前用户
             const updatedClaimers = existingClaimers.filter(u => u !== currentUser);
             const newClaimedByString = updatedClaimers.join(', ');
 
             let newStatus = 'AVAILABLE';
             let newExpiresAt = product.share_expires_at;
 
-            // 如果原本是拼单
             if (product.status === 'SHARING' || product.status === 'SHARE_FULL') {
                 if (updatedClaimers.length >= 1) {
                     newStatus = 'SHARING';
                 } else {
                     newStatus = 'AVAILABLE';
-                    newExpiresAt = null; // 没人了重置倒计时
+                    newExpiresAt = null;
                 }
             } else {
-                // 如果是独占抢购（CLAIM ALL）
                 newStatus = 'AVAILABLE';
                 newExpiresAt = null;
             }
@@ -288,12 +300,10 @@
                 return;
             }
 
-            // 更新本地数据
             product.status = newStatus;
             product.claimed_by = newClaimedByString;
             product.share_expires_at = newExpiresAt;
 
-            // 刷新弹窗与卡片状态
             renderCartItems();
             updateCartCount();
             if (products[currentIndex] && products[currentIndex].id === productId) {
@@ -301,22 +311,16 @@
             }
         }
 
-        /* ----- 页码点击跳转逻辑 ----- */
         function jumpToPage() {
             if (!products || products.length === 0) return;
-
             const totalPages = products.length;
             const input = prompt(`Enter page number (1 - ${totalPages}):`, (currentIndex + 1).toString());
-
             if (input === null) return;
-
             const pageNum = parseInt(input.trim(), 10);
-
             if (isNaN(pageNum) || pageNum < 1 || pageNum > totalPages) {
-                alert(`Please enter a valid page number between 1 and ${totalPages}!`);
+                alert(`Valid page number: 1 - ${totalPages}`);
                 return;
             }
-
             currentIndex = pageNum - 1;
             renderCurrentCard();
         }
@@ -335,21 +339,37 @@
             }
         }
 
+        /* 支持 > 1000 条数据的循环拉取逻辑 */
         async function loadProducts() {
             try {
-                const { data, error } = await supabaseClient
-                    .from('products')
-                    .select('*')
-                    .order('id', { ascending: false });
+                let allProducts = [];
+                let page = 0;
+                const pageSize = 1000;
+                let hasMore = true;
 
-                if (error) {
-                    alert('Error loading data!\nCode: ' + error.code + '\nMessage: ' + error.message);
-                    return;
+                while (hasMore) {
+                    const { data, error } = await supabaseClient
+                        .from('products')
+                        .select('*')
+                        .order('id', { ascending: false })
+                        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+                    if (error) {
+                        alert('Error loading data!\nMessage: ' + error.message);
+                        return;
+                    }
+
+                    if (data && data.length > 0) {
+                        allProducts = allProducts.concat(data);
+                        if (data.length < pageSize) hasMore = false;
+                        else page++;
+                    } else {
+                        hasMore = false;
+                    }
                 }
 
-                products = data || [];
+                products = allProducts;
                 currentIndex = 0;
-
                 updateCartCount();
 
                 if (products.length === 0) {
@@ -383,12 +403,10 @@
             preloadImages(currentIndex);
 
             const current = products[currentIndex];
-            document.getElementById('card-counter').innerText = `${currentIndex + 1} / ${products.length} 🔍`;
+            document.getElementById('card-counter').innerText = `${currentIndex + 1}/${products.length}`;
 
             const btnBack = document.getElementById('btn-back');
-            if (btnBack) {
-                btnBack.disabled = (currentIndex <= 0);
-            }
+            if (btnBack) btnBack.disabled = (currentIndex <= 0);
 
             const imgUrl = (current.image_url && typeof current.image_url === 'string' && current.image_url.trim() !== '') 
                 ? current.image_url.trim() 
@@ -396,62 +414,36 @@
 
             const card = document.createElement('div');
             card.id = `card-${current.id}`;
-            card.className = "absolute inset-0 bg-gray-800 rounded-3xl overflow-hidden card-shadow border border-gray-700 flex flex-col justify-between transition-all duration-300";
-            
-            const imgContainer = document.createElement('div');
-            imgContainer.className = "relative w-full h-80 bg-black/50 overflow-hidden flex items-center justify-center cursor-zoom-in group";
-            imgContainer.onclick = () => openImageModal(imgUrl);
+            card.className = "absolute inset-0 rounded-3xl overflow-hidden card-glow border border-white/10 flex flex-col justify-between transition-all duration-300 bg-gray-900";
 
-            const imgEl = document.createElement('img');
-            imgEl.src = imgUrl;
-            imgEl.alt = current.title || 'Product Image';
-            imgEl.className = "w-full h-full object-contain transition-transform duration-300 group-hover:scale-105";
-            imgEl.decoding = "async";
-
-            const zoomHint = document.createElement('div');
-            zoomHint.className = "absolute top-3 left-3 bg-black/60 backdrop-blur-md p-1.5 rounded-full text-xs text-gray-300 border border-white/10 flex items-center justify-center pointer-events-none";
-            zoomHint.innerHTML = "🔍";
-
-            const stockBadge = document.createElement('div');
-            stockBadge.className = "absolute top-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-red-400 border border-white/10 pointer-events-none";
-            stockBadge.innerText = `${current.stock || 0} left`;
-
-            const priceTag = document.createElement('div');
-            priceTag.className = "absolute bottom-3 left-3 bg-red-600/90 backdrop-blur-md px-3 py-1.5 rounded-xl flex items-baseline gap-2 shadow-lg border border-red-500/50 pointer-events-none";
-            
             const currentPrice = current.price ? (current.price.toString().startsWith('$') ? current.price : `$${current.price}`) : '';
             const originalPrice = current.original_price ? (current.original_price.toString().startsWith('$') ? current.original_price : `$${current.original_price}`) : '';
 
-            if (currentPrice && originalPrice) {
-                priceTag.innerHTML = `
-                    <span class="text-xl font-black text-white">${currentPrice}</span>
-                    <span class="text-xs text-red-200 line-through opacity-75">${originalPrice}</span>
-                `;
-            } else if (currentPrice) {
-                priceTag.innerHTML = `<span class="text-xl font-black text-white">${currentPrice}</span>`;
-            } else if (originalPrice) {
-                priceTag.innerHTML = `<span class="text-xl font-black text-white">${originalPrice}</span>`;
-            } else {
-                priceTag.innerHTML = `<span class="text-sm font-bold text-white">Special Deal</span>`;
-            }
+            card.innerHTML = `
+                <!-- Background Full Image -->
+                <div class="relative w-full h-full cursor-zoom-in group" onclick="openImageModal('${imgUrl}')">
+                    <img src="${imgUrl}" alt="${current.title || 'Product'}" class="w-full h-full object-cover">
+                    
+                    <!-- Top Floating Badges -->
+                    <div class="absolute top-4 left-4 right-4 flex justify-between items-center pointer-events-none">
+                        <div class="glass-panel px-3 py-1 rounded-full text-[10px] font-bold text-gray-200">🔍 Tap to Zoom</div>
+                        <div class="glass-panel px-3 py-1 rounded-full text-xs font-extrabold text-red-400 border border-red-500/20">${current.stock || 0} Left</div>
+                    </div>
 
-            imgContainer.appendChild(imgEl);
-            imgContainer.appendChild(zoomHint);
-            imgContainer.appendChild(stockBadge);
-            imgContainer.appendChild(priceTag);
-
-            const contentContainer = document.createElement('div');
-            contentContainer.className = "p-5 flex-1 flex flex-col justify-between";
-            contentContainer.innerHTML = `
-                <div>
-                    <h2 class="text-xl font-black text-white line-clamp-1">${current.title || 'Clearance Item'}</h2>
-                    <p class="text-xs text-gray-400 mt-1">ID: #${current.id}</p>
+                    <!-- Bottom Gradient & Info Overlay -->
+                    <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-gray-950 via-gray-950/80 to-transparent p-5 pt-12 flex flex-col justify-end">
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="text-3xl font-black text-white tracking-tight">${currentPrice || 'Special Deal'}</span>
+                            ${originalPrice ? `<span class="text-xs text-gray-400 line-through">${originalPrice}</span>` : ''}
+                        </div>
+                        <h2 class="text-lg font-bold text-white line-clamp-1">${current.title || 'Clearance Item'}</h2>
+                        <p class="text-[10px] text-gray-400 mt-0.5">ID: #${current.id}</p>
+                        
+                        <!-- Dynamic Status Badge -->
+                        <div id="card-status-badge" class="mt-3 text-center py-2 px-3 rounded-xl text-xs font-bold transition backdrop-blur-md"></div>
+                    </div>
                 </div>
-                <div id="card-status-badge" class="mt-2 text-center py-2 px-3 rounded-xl text-xs font-bold transition"></div>
             `;
-
-            card.appendChild(imgContainer);
-            card.appendChild(contentContainer);
 
             cardStack.appendChild(card);
             
@@ -509,7 +501,7 @@
                 btnShare.disabled = true;
                 textClaim.innerText = "CLAIMED";
                 textShare.innerText = "LOCKED";
-                badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/20";
+                badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/30";
                 badge.innerText = userAlreadyJoined ? `👑 You claimed this item!` : `👑 Claimed All${claimerInfo}! Sold out.`;
             } 
             else if (isExpired && claimerCount >= 2) {
@@ -517,24 +509,24 @@
                 btnShare.disabled = true;
                 textClaim.innerText = "LOCKED";
                 textShare.innerText = "CLOSED";
-                badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20";
-                badge.innerText = `⏳ 12h Time Up! Group Deal Closed with ${claimerCount} users (${product.claimed_by}).`;
+                badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30";
+                badge.innerText = `⏳ 12h Time Up! Closed with ${claimerCount} users (${product.claimed_by}).`;
             }
             else if (status === 'SHARING') {
                 btnClaim.disabled = true;
                 textClaim.innerText = "LOCKED";
 
-                let timeNotice = timeRemainingText ? ` (Ends in: ${timeRemainingText})` : ` (Waiting for 2nd user...)`;
+                let timeNotice = timeRemainingText ? ` (Ends: ${timeRemainingText})` : ` (Waiting for 2nd...)`;
                 
                 if (userAlreadyJoined) {
                     btnShare.disabled = true;
                     textShare.innerText = "JOINED";
-                    badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20";
+                    badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30";
                     badge.innerText = `🤝 Joined Share (${claimerCount}/3)${timeNotice}`;
                 } else {
                     btnShare.disabled = false;
-                    textShare.innerText = "JOIN SHARE";
-                    badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20";
+                    textShare.innerText = "JOIN";
+                    badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30";
                     badge.innerText = `🤝 Active Share (${claimerCount}/3)${timeNotice}! Join now.`;
                 }
             } 
@@ -543,15 +535,15 @@
                 btnShare.disabled = true;
                 textClaim.innerText = "LOCKED";
                 textShare.innerText = "FULL";
-                badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20";
-                badge.innerText = `🔒 Group Share FULL (3/3)${claimerInfo}! Locked for order.`;
+                badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30";
+                badge.innerText = `🔒 Group Share FULL (3/3)${claimerInfo}!`;
             } 
             else {
                 btnClaim.disabled = false;
                 btnShare.disabled = false;
                 textClaim.innerText = "CLAIM ALL";
                 textShare.innerText = "SHARE";
-                badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20";
+                badge.className = "text-center py-2 px-3 rounded-xl text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
                 badge.innerText = "⚡ Available! Claim or Share now.";
             }
         }
@@ -605,7 +597,7 @@
             }
 
             if (latest.share_expires_at && new Date(latest.share_expires_at).getTime() <= new Date().getTime() && existingClaimers.length >= 2) {
-                alert('This 12-hour group share has expired and closed.');
+                alert('This 12-hour group share has expired.');
                 updateButtonsState(current);
                 return;
             }
@@ -678,12 +670,10 @@
             if (timerInterval) clearInterval(timerInterval);
             document.getElementById('card-stack').classList.add('hidden');
             document.getElementById('empty-state').classList.remove('hidden');
-            document.getElementById('card-counter').innerText = `${products.length} / ${products.length} 🔍`;
+            document.getElementById('card-counter').innerText = `${products.length}/${products.length}`;
             
             const btnBack = document.getElementById('btn-back');
-            if (btnBack) {
-                btnBack.disabled = false;
-            }
+            if (btnBack) btnBack.disabled = false;
         }
 
         supabaseClient
