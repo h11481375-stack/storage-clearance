@@ -245,17 +245,45 @@
         }
 
         function startSpin() {
-            const btn = document.getElementById('btn-spin');
-            btn.innerText = "SPINNING...";
-            btn.disabled = true;
+    const btn = document.getElementById('btn-spin');
+    const spinner = document.getElementById('spinner-box');
+    
+    btn.innerText = "SPINNING...";
+    btn.disabled = true;
 
-            setTimeout(() => {
-                alert("🎉 Congratulations! You won a $3 Discount Voucher! Contact support on WhatsApp to claim!");
-                btn.innerText = "SPIN NOW 🚀";
-                btn.disabled = false;
-                closeLuckyWheelModal();
-            }, 1200);
+    // 1. 生成 0 到 100 之间的随机数
+    const rand = Math.random() * 100;
+
+    // 2. 模拟转盘转动效果
+    let count = 0;
+    const spinEffect = setInterval(() => {
+        count++;
+        spinner.style.transform = `rotate(${count * 45}deg)`;
+    }, 50);
+
+    // 3. 1.5 秒后停止转动并判定结果
+    setTimeout(() => {
+        clearInterval(spinEffect);
+        spinner.style.transform = 'rotate(0deg)';
+        
+        btn.innerText = "SPIN NOW 🚀";
+        btn.disabled = false;
+
+        // 4. 根据概率区间判定中奖类型
+        if (rand < 2) {
+            // 2% 概率：三块优惠券
+            alert("🎉 CONGRATS! You won a $3 Off Voucher!\n\nTake a screenshot and contact support on WhatsApp to claim!");
+            closeLuckyWheelModal();
+        } else if (rand < 5) {
+            // 3% 概率 (2 + 3 = 5)：Labubu 盲盒
+            alert("🔥 UNBELIEVABLE! You won a Labubu Blind Box!\n\nTake a screenshot and contact support on WhatsApp immediately!");
+            closeLuckyWheelModal();
+        } else {
+            // 95% 概率 (剩下 95%)：未中奖
+            alert("😅 So Close! You didn't win this time.\n\nTry again tomorrow or browse more clearance deals!");
         }
+    }, 1500);
+}
 
         function openCartModal() {
             if (!currentUser) { checkUser(); return; }
