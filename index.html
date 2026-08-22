@@ -283,16 +283,16 @@
         localStorage.setItem('lastSpinDate', today);
 
         // 概率判定
-        if (rand < 2) {
+        if (rand < 1) {
             // 2% 概率
             alert("🎉 CONGRATS! You won a $3 Off Voucher!\n\nTake a screenshot and contact support on WhatsApp to claim!");
             closeLuckyWheelModal();
-        } else if (rand < 5) {
+        } else if (rand < 4) {
             // 3% 概率
             alert("🔥 UNBELIEVABLE! You won a Labubu Blind Box!\n\nTake a screenshot and contact support on WhatsApp immediately!");
             closeLuckyWheelModal();
         } else {
-            // 95% 概率
+            // 96% 概率
             alert("😅 So Close! You didn't win this time.\n\nTry again tomorrow or browse more clearance deals!");
         }
     }, 1500);
