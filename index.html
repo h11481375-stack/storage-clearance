@@ -244,24 +244,34 @@
             document.getElementById('lucky-modal').classList.add('hidden');
         }
 
-        function startSpin() {
+       function startSpin() {
     const btn = document.getElementById('btn-spin');
     const spinner = document.getElementById('spinner-box');
-    
+
+    // 1. 获取今天的日期字符串（例如："Sat Aug 22 2026"）
+    const today = new Date().toDateString();
+    const lastSpinDate = localStorage.getItem('lastSpinDate');
+
+    // 2. 检查今天是否已经抽过奖
+    if (lastSpinDate === today) {
+        alert("⚠️ You have already used your daily spin today! Please come back tomorrow.");
+        return;
+    }
+
     btn.innerText = "SPINNING...";
     btn.disabled = true;
 
-    // 1. 生成 0 到 100 之间的随机数
+    // 生成 0 到 100 随机数
     const rand = Math.random() * 100;
 
-    // 2. 模拟转盘转动效果
+    // 转盘旋转动画
     let count = 0;
     const spinEffect = setInterval(() => {
         count++;
         spinner.style.transform = `rotate(${count * 45}deg)`;
     }, 50);
 
-    // 3. 1.5 秒后停止转动并判定结果
+    // 1.5 秒后停止并输出结果
     setTimeout(() => {
         clearInterval(spinEffect);
         spinner.style.transform = 'rotate(0deg)';
@@ -269,17 +279,20 @@
         btn.innerText = "SPIN NOW 🚀";
         btn.disabled = false;
 
-        // 4. 根据概率区间判定中奖类型
+        // 3. 抽奖成功后，记录今天的日期到本地存储
+        localStorage.setItem('lastSpinDate', today);
+
+        // 概率判定
         if (rand < 2) {
-            // 2% 概率：三块优惠券
+            // 2% 概率
             alert("🎉 CONGRATS! You won a $3 Off Voucher!\n\nTake a screenshot and contact support on WhatsApp to claim!");
             closeLuckyWheelModal();
         } else if (rand < 5) {
-            // 3% 概率 (2 + 3 = 5)：Labubu 盲盒
+            // 3% 概率
             alert("🔥 UNBELIEVABLE! You won a Labubu Blind Box!\n\nTake a screenshot and contact support on WhatsApp immediately!");
             closeLuckyWheelModal();
         } else {
-            // 95% 概率 (剩下 95%)：未中奖
+            // 95% 概率
             alert("😅 So Close! You didn't win this time.\n\nTry again tomorrow or browse more clearance deals!");
         }
     }, 1500);
