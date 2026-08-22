@@ -144,26 +144,26 @@
     </div>
 
     <!-- Main Container -->
-    <main class="relative w-full max-w-sm h-[520px] flex items-center justify-center my-auto">
-        <!-- Empty State -->
-        <div id="empty-state" class="hidden text-center space-y-5 p-8 glass-panel rounded-3xl w-full border border-white/10">
-            <div class="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center text-4xl mx-auto">🎉</div>
-            <div>
-                <h2 class="text-xl font-bold text-white">All Caught Up!</h2>
-                <p class="text-xs text-gray-400 mt-1">You've seen all clearance products for now.</p>
-            </div>
-            <div class="flex gap-3 pt-2">
-                <button onclick="prevCard()" class="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl font-bold text-xs transition">↩️ Back</button>
-                <button onclick="resetProgress()" class="flex-1 py-3 bg-red-600 hover:bg-red-500 rounded-2xl font-bold text-xs shadow-lg shadow-red-900/30 transition">Restart</button>
-            </div>
+<main class="relative w-full max-w-sm h-[520px] flex items-center justify-center my-auto overflow-hidden">
+    <!-- Empty State -->
+    <div id="empty-state" class="hidden text-center space-y-5 p-8 glass-panel rounded-3xl w-full border border-white/10">
+        <div class="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center text-4xl mx-auto">🎉</div>
+        <div>
+            <h2 class="text-xl font-bold text-white">All Caught Up!</h2>
+            <p class="text-xs text-gray-400 mt-1">You've seen all clearance products for now.</p>
         </div>
+        <div class="flex gap-3 pt-2">
+            <button onclick="prevCard()" class="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl font-bold text-xs transition">↩️ Back</button>
+            <button onclick="resetProgress()" class="flex-1 py-3 bg-red-600 hover:bg-red-500 rounded-2xl font-bold text-xs shadow-lg shadow-red-900/30 transition">Restart</button>
+        </div>
+    </div>
 
-        <!-- 1. Tinder Card Mode View -->
-        <div id="card-stack" class="relative w-full h-full"></div>
+    <!-- 1. Tinder Card Mode View -->
+    <div id="card-stack" class="relative w-full h-full"></div>
 
-        <!-- 2. Grid Mode View (双列无限滚动模式) -->
-        <div id="grid-view" class="hidden w-full h-full overflow-y-auto custom-scroll grid grid-cols-2 gap-3 p-1 content-start"></div>
-    </main>
+    <!-- 2. Grid Mode View (修复了高度和 flex 适应) -->
+    <div id="grid-view" class="hidden w-full h-full overflow-y-auto custom-scroll grid grid-cols-2 gap-3 p-1 align-content-start"></div>
+</main>
 
     <!-- Action Buttons Footer (Cards Mode Only) -->
     <footer id="action-buttons" class="w-full max-w-sm flex items-center justify-around py-3 px-2 z-10">
@@ -325,17 +325,18 @@
             }
         }
 
-        /* 双列无限滚动网格渲染逻辑（穿插 Labubu 抽奖 Banner） */
-        function renderGridView() {
-            const gridView = document.getElementById('grid-view');
-            gridView.innerHTML = '';
-            currentGridLoadedCount = 0;
+        /* 双列无限滚动网格渲染逻辑 */
+function renderGridView() {
+    const gridView = document.getElementById('grid-view');
+    gridView.innerHTML = '';
+    currentGridLoadedCount = 0;
 
-            gridView.className = "hidden w-full h-full overflow-y-auto custom-scroll grid grid-cols-2 gap-3 p-1 content-start";
-            gridView.onscroll = handleGridScroll;
+    // 强制显式定义 grid 和的高度，防止高度坍塌
+    gridView.className = "w-full h-full overflow-y-auto custom-scroll grid grid-cols-2 gap-3 p-1 content-start";
+    gridView.onscroll = handleGridScroll;
 
-            loadMoreGridItems();
-        }
+    loadMoreGridItems();
+}
 
         function loadMoreGridItems() {
             const gridView = document.getElementById('grid-view');
