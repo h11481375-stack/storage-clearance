@@ -57,7 +57,14 @@
 
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // 核心渲染逻辑：按天分组，组内优先排列 CLAIM_ALL 与 SHARE_FULL
+        // 获取客人的真实操作时间 helper
+        function getItemTime(item) {
+            // 优先获取客人操作时的精准时间字段（如有 claimed_at），退而求其次用 updated_at 或 created_at
+            const timeRaw = item.claimed_at || item.updated_at || item.created_at;
+            return timeRaw ? new Date(timeRaw) : new Date();
+        }
+
+        // 核心渲染逻辑
         function renderBills(bills) {
             const container = document.getElementById('bills-container');
             container.innerHTML = '';
@@ -67,15 +74,14 @@
                     <div class="text-center space-y-3 py-16 glass-panel rounded-3xl border border-white/10">
                         <div class="text-3xl">🧾</div>
                         <div class="text-sm font-bold text-white">No Claims Recorded</div>
-                        <div class="text-xs text-gray-400">No customers have claimed products yet.</div>
                     </div>`;
                 return;
             }
 
-            // 1. 按日期分组 (例如: "Aug 22, 2026")
+            // 1. 按客人操作的实际日期分组 (例如: "Aug 24, 2026")
             const groupedByDate = {};
             bills.forEach(item => {
-                const dateObj = new Date(item.created_at || item.updated_at || Date.now());
+                const dateObj = getItemTime(item);
                 const dateStr = dateObj.toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'short',
@@ -88,26 +94,29 @@
                 groupedByDate[dateStr].push(item);
             });
 
-            // 2. 遍历每天记录并在【每天组内】重排优先级
+            // 2. 遍历每天记录并在【当天内部】重新排序
             Object.keys(groupedByDate).forEach(date => {
                 const dayBills = groupedByDate[date];
 
-                // 当天组内排序规则：CLAIM_ALL 和 SHARE_FULL / SHARE 置顶
+                // 排序规则：【严格只有】CLAIM_ALL / SHARE_FULL 才能置顶，普通 SHARING / CLAIM 排在后面
                 dayBills.sort((a, b) => {
-                    const priorityStatuses = ['claim_all', 'claimed_all', 'share_full', 'sharing'];
-                    
-                    const statusA = (a.status || '').toLowerCase();
-                    const statusB = (b.status || '').toLowerCase();
+                    const statusA = (a.status || '').toLowerCase().trim();
+                    const statusB = (b.status || '').toLowerCase().trim();
 
-                    const isPriorityA = priorityStatuses.includes(statusA);
-                    const isPriorityB = priorityStatuses.includes(statusB);
+                    // 只有这三种状态属于最高优先级
+                    const topStatuses = ['claim_all', 'claimed_all', 'share_full'];
 
-                    if (isPriorityA && !isPriorityB) return -1; // A 靠前
-                    if (!isPriorityA && isPriorityB) return 1;  // B 靠前
-                    return 0; // 维持原有自然排序
+                    const isTopA = topStatuses.includes(statusA);
+                    const isTopB = topStatuses.includes(statusB);
+
+                    if (isTopA && !isTopB) return -1; // A 置顶
+                    if (!isTopA && isTopB) return 1;  // B 置顶
+
+                    // 如果同级，按客人操作时间从晚到早（倒序）排列
+                    return getItemTime(b) - getItemTime(a);
                 });
 
-                // 3. 渲染天的 DOM 结构
+                // 3. 渲染 DOM
                 const dateGroup = document.createElement('div');
                 dateGroup.className = "mb-5 space-y-2";
 
@@ -119,17 +128,19 @@
                 `;
 
                 dayBills.forEach(item => {
-                    const status = (item.status || '').toUpperCase();
+                    const status = (item.status || '').toUpperCase().trim();
                     const isSpecial = ['CLAIM_ALL', 'CLAIMED_ALL', 'SHARE_FULL'].includes(status);
 
                     const price = item.price ? (item.price.toString().startsWith('$') ? item.price : `$${item.price}`) : 'N/A';
                     const imgUrl = item.image_url || 'https://via.placeholder.com/80';
-                    const timeStr = new Date(item.created_at || item.updated_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     
-                    // 获取 Claim 用户列表信息
+                    // 格式化展示客人点击的精准时间 (如 13:15)
+                    const actionDate = getItemTime(item);
+                    const timeStr = actionDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+                    
                     const claimers = item.claimed_by || 'Unknown User';
 
-                    let badgeColor = 'bg-gray-500/20 text-gray-300 border-gray-500/30';
+                    let badgeColor = 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40';
                     let badgeText = status;
 
                     if (status === 'CLAIM_ALL' || status === 'CLAIMED_ALL') {
@@ -139,12 +150,12 @@
                         badgeColor = 'bg-purple-500/20 text-purple-300 border-purple-500/40';
                         badgeText = '🔒 SHARE FULL';
                     } else if (status === 'SHARING') {
-                        badgeColor = 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40';
+                        badgeColor = 'bg-blue-500/20 text-blue-300 border-blue-500/30';
                         badgeText = '🤝 SHARING';
                     }
 
                     groupHtml += `
-                        <div class="p-3.5 rounded-2xl ${isSpecial ? 'bg-gradient-to-r from-red-950/30 to-purple-950/30 border border-red-500/30' : 'glass-panel'} flex items-center justify-between gap-3 shadow-md">
+                        <div class="p-3.5 rounded-2xl ${isSpecial ? 'bg-gradient-to-r from-red-950/40 to-purple-950/40 border border-red-500/40 shadow-lg shadow-red-950/20' : 'glass-panel'} flex items-center justify-between gap-3 shadow-md">
                             <img src="${imgUrl}" class="w-12 h-12 object-cover rounded-xl bg-black/40 flex-shrink-0">
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-1.5">
@@ -174,7 +185,7 @@
             });
         }
 
-        // 管理员模式：从 Supabase 加载所有被 Claim 过/分享中的商品记录
+        // 查询数据库
         async function loadAllAdminBills() {
             try {
                 const { data, error } = await supabaseClient
@@ -184,11 +195,11 @@
 
                 if (error) {
                     document.getElementById('bills-container').innerHTML = `
-                        <div class="text-center text-xs text-red-400 py-10">Error loading bills: ${error.message}</div>`;
+                        <div class="text-center text-xs text-red-400 py-10">Error: ${error.message}</div>`;
                     return;
                 }
 
-                // 过滤出所有有 claimed_by 记录的全部商品（不限用户）
+                // 只加载有被 Claim 或 Share 过的记录
                 const allClaimedBills = data.filter(item => item.claimed_by && item.claimed_by.trim() !== '');
 
                 renderBills(allClaimedBills);
