@@ -541,7 +541,7 @@ function renderGridView() {
 
             renderCartItems();
             updateCartCount();
-            if (viewMode === 'CARD') ();
+            if (viewMode === 'CARD') renderCurrentCard();
             else renderGridView();
         }
 
@@ -556,12 +556,12 @@ function renderGridView() {
                 return;
             }
             currentIndex = pageNum - 1;
-            ();
+            renderCurrentCard();
         }
 
         function resetProgress() {
             currentIndex = 0;
-            ();
+            renderCurrentCard();
         }
 
         async function loadProducts() {
@@ -623,7 +623,7 @@ function renderGridView() {
             card.id = `card-${current.id}`;
             card.className = "absolute inset-0 w-full h-full rounded-3xl overflow-hidden card-glow border border-white/10 flex flex-col justify-between transition-all duration-300 bg-gray-900";
 
-            const currentPrice = current.price ? (current.price.toString().startsWith('$') ? current.price : `$${current.price}`) : '';
+      const currentPrice = current.price ? (current.price.toString().startsWith('$') ? current.price : `$${current.price}`) : '';
             const originalPrice = current.original_price ? (current.original_price.toString().startsWith('$') ? current.original_price : `$${current.original_price}`) : '';
 
             card.innerHTML = `
