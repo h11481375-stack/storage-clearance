@@ -144,7 +144,7 @@
     </div>
 
     <!-- Main Container -->
-<main class="relative w-full max-w-sm h-[520px] flex items-center justify-center my-auto overflow-hidden">
+<main class="relative w-full max-w-sm h-[520px] mx-auto flex flex-col items-center justify-center my-auto overflow-hidden">
     <!-- Empty State -->
     <div id="empty-state" class="hidden text-center space-y-5 p-8 glass-panel rounded-3xl w-full border border-white/10">
         <div class="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center text-4xl mx-auto">🎉</div>
@@ -621,13 +621,13 @@ function renderGridView() {
 
             const card = document.createElement('div');
             card.id = `card-${current.id}`;
-            card.className = "absolute inset-0 w-full h-full rounded-3xl overflow-hidden card-glow border border-white/10 flex flex-col justify-between transition-all duration-300 bg-gray-900";
+            card.className = "absolute inset-0 w-full h-full min-h-full block rounded-3xl overflow-hidden card-glow border border-white/10 flex flex-col justify-between transition-all duration-300 bg-gray-900";
 
       const currentPrice = current.price ? (current.price.toString().startsWith('$') ? current.price : `$${current.price}`) : '';
             const originalPrice = current.original_price ? (current.original_price.toString().startsWith('$') ? current.original_price : `$${current.original_price}`) : '';
 
             card.innerHTML = `
-                <div class="relative w-full h-full cursor-zoom-in group" onclick="openImageModal('${imgUrl}')">
+                <div class="relative w-full h-full flex-1 min-h-0 cursor-zoom-in group" onclick="openImageModal('${imgUrl}')">
                     <img src="${imgUrl}" alt="${current.title || 'Product'}" class="w-full h-full object-cover">
                     <div class="absolute top-4 left-4 right-4 flex justify-between items-center pointer-events-none">
                         <div class="glass-panel px-3 py-1 rounded-full text-[10px] font-bold text-gray-200">🔍 Tap to Zoom</div>
